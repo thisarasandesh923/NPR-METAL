@@ -1,0 +1,373 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    font-family: "Noto Sans Sinhala", system-ui, sans-serif;
+    color: #0f2747;
+    background: #f4f7fb;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+  }
+
+  button,
+  input,
+  select {
+    font-family: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  table th {
+    padding: 13px 18px;
+    color: #7a899d;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.015em;
+    white-space: nowrap;
+  }
+
+  table td {
+    padding: 15px 18px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}
+
+.brand-mark {
+  position: relative;
+  display: flex;
+  width: 43px;
+  height: 43px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #f58220;
+  color: white;
+  font-size: 21px;
+  font-weight: 800;
+  box-shadow: inset -8px -8px 0 rgba(117, 45, 0, 0.12);
+}
+
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 26px;
+  height: 26px;
+  border: 5px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+}
+
+.brand-mark span {
+  position: relative;
+  z-index: 1;
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 20px;
+  width: 48px;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  background: #f58220;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.stat-card {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(15, 39, 71, 0.08);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+.stat-icon {
+  display: flex;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+}
+
+.stat-blue {
+  color: #2268aa;
+  background: #e9f3ff;
+}
+
+.stat-green {
+  color: #18805f;
+  background: #e7f8f1;
+}
+
+.stat-orange {
+  color: #e16b12;
+  background: #fff0e4;
+}
+
+.stat-navy {
+  color: #163c66;
+  background: #e9eef5;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.status > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-paid {
+  color: #137a57;
+  background: #e7f8f0;
+}
+
+.status-partial {
+  color: #c26313;
+  background: #fff2df;
+}
+
+.status-due {
+  color: #bf4141;
+  background: #ffeded;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.form-control {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #dbe3ec;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 14px;
+  color: #0f2747;
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.form-control:focus {
+  border-color: #f58220;
+  box-shadow: 0 0 0 3px rgba(245, 130, 32, 0.12);
+}
+
+.invoice-panel {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(15, 39, 71, 0.035);
+}
+
+.invoice-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #eef2f6;
+  padding: 17px 20px;
+  background: #fbfcfe;
+}
+
+.invoice-panel-heading h2 {
+  color: #092547;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.invoice-panel-heading p {
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.invoice-step {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: #eaf2fb;
+  color: #124f8c;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.table-control {
+  min-height: 42px;
+  border: 1px solid #dbe3ec;
+  border-radius: 9px;
+  background: #fff;
+  padding: 0 12px;
+  color: #253b55;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+}
+
+.table-control:focus {
+  border-color: #f58220;
+  box-shadow: 0 0 0 3px rgba(245, 130, 32, 0.1);
+}
+
+.locked-price {
+  cursor: not-allowed;
+  border-color: #e8edf3;
+  background: #f4f7fa;
+  color: #64748b;
+}
+
+.invoice-items-table td {
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+
+.transport-option {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  text-align: left;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.transport-option:hover {
+  border-color: #f7b77f;
+  background: #fffaf5;
+}
+
+.transport-option-active {
+  border-color: #f58220;
+  background: #fff8f1;
+  box-shadow: 0 0 0 3px rgba(245, 130, 32, 0.08);
+}
+
+.transport-option > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.transport-option strong {
+  color: #223b58;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.transport-option small {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.option-radio {
+  display: flex;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #cbd5e1;
+  border-radius: 50%;
+}
+
+.transport-option-active .option-radio {
+  border-color: #f58220;
+}
+
+.option-radio > span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f58220;
+}
+
+.payment-state {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 9px;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.payment-state > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.payment-state-paid {
+  color: #137a57;
+  background: #e7f8f0;
+}
+
+.payment-state-partial {
+  color: #c26313;
+  background: #fff2df;
+}
+
+.payment-state-unpaid {
+  color: #bf4141;
+  background: #ffeded;
+}
+
+@media (max-width: 640px) {
+  table th,
+  table td {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+}
