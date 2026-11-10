@@ -1,26 +1,39 @@
+import "dotenv/config";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { pool } from "../db/pool.js";
+import pg from "pg";
+import { getMigrationDatabaseUrl } from "../db/config.js";
+
+const { Pool } = pg;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.resolve(__dirname, "../../../database/migrations");
 
 async function checkMigrationStatus(): Promise<void> {
+  let migrationPool: pg.Pool | null = null;
+
   try {
+    migrationPool = new Pool({
+      connectionString: getMigrationDatabaseUrl(),
+      max: 2,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 10000,
+    });
+
     const entries = await readdir(migrationsDir, { withFileTypes: true });
     const localMigrations = entries
       .filter((entry) => entry.isFile() && entry.name.endsWith(".sql"))
       .map((entry) => entry.name.replace(/\.sql$/, ""))
       .sort();
 
-    const tableCheck = await pool.query<{ table_regclass: string | null }>(
+    const tableCheck = await migrationPool.query<{ table_regclass: string | null }>(
       "SELECT to_regclass('public.pgmigrations')::text AS table_regclass"
     );
 
     const appliedMap = new Map<string, string>();
     if (tableCheck.rows[0]?.table_regclass) {
-      const result = await pool.query<{ name: string; run_on: Date }>(
+      const result = await migrationPool.query<{ name: string; run_on: Date }>(
         "SELECT name, run_on FROM public.pgmigrations ORDER BY id ASC"
       );
       for (const row of result.rows) {
@@ -48,7 +61,7 @@ async function checkMigrationStatus(): Promise<void> {
     );
     process.exitCode = 1;
   } finally {
-    await pool.end();
+    await migrationPool?.end();
   }
 }
 

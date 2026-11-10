@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "tsx --test src/tests/**/*.test.ts",
+    "test:unit": "tsx --test src/tests/db-config.test.ts",
     "test:db": "tsx --test src/tests/db-integrity.test.ts",
     "test:security": "tsx --test src/tests/db-security-rls.test.ts",
     "dev": "tsx watch src/server.ts",
@@ -14,8 +15,8 @@
     "db:check": "tsx src/scripts/check-db.ts",
     "migrate:check": "tsx src/scripts/check-migrations.ts",
     "migrate:status": "tsx src/scripts/migration-status.ts",
-    "migrate:dry-run": "node-pg-migrate up -m ../database/migrations --envPath .env --check-order --single-transaction --dry-run",
-    "migrate:up": "node-pg-migrate up -m ../database/migrations --envPath .env --check-order --single-transaction",
+    "migrate:dry-run": "tsx src/scripts/run-migrations.ts --dry-run",
+    "migrate:up": "tsx src/scripts/run-migrations.ts",
     "migrate:create": "node-pg-migrate create -m ../database/migrations -j sql --migration-filename-format index"
   },
   "keywords": [],

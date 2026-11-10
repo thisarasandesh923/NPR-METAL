@@ -1,12 +1,8 @@
-
 import "dotenv/config";
 import { Pool } from "pg";
+import { getRuntimeDatabaseUrl } from "./config.js";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is not configured");
-}
+const databaseUrl = getRuntimeDatabaseUrl();
 
 export const pool = new Pool({
   connectionString: databaseUrl,

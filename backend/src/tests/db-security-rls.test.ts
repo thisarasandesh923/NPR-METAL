@@ -1,9 +1,17 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import pg from "pg";
 
 const { Pool } = pg;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const POLICY_SCRIPT_PATH = path.resolve(
+  __dirname,
+  "../../../database/scripts/apply_runtime_role_policies.sql"
+);
 
 function getVerifiedLocalTestUrl(): string {
   const testUrl = process.env.TEST_DATABASE_URL;
@@ -38,7 +46,7 @@ let cashierId = "";
 let custId = "";
 let matId = 0;
 
-describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests", () => {
+describe("Phase 2B3B / 2C — PostgreSQL 17 Supabase Security Hardening, RLS & Restricted Role Tests", () => {
   before(async () => {
     const idCheck = await adminPool.query<{ db: string; ver: string }>(
       "SELECT current_database() AS db, version() AS ver"
@@ -77,7 +85,7 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
 
     const appUrl = new URL(TEST_URL);
     appUrl.username = "npr_app_user";
-    appUrl.password = "test_only_app_password_2b2";
+    appUrl.password = process.env.TEST_APP_USER_PASSWORD ?? "test_only_app_password_2b2";
     appUserPool = new Pool({ connectionString: appUrl.toString(), max: 4 });
   });
 
@@ -156,7 +164,7 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
     }
   });
 
-  it("4. Denies function EXECUTE privileges on application functions to PUBLIC, anon, and authenticated", async () => {
+  it("4. Denies function EXECUTE privileges on application functions and validates minimal SECURITY DEFINER", async () => {
     const funcs = [
       "set_updated_at",
       "forbid_append_only_mutation",
@@ -195,13 +203,14 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
       assert.equal(appExec.rows[0].exec, false, `npr_app_user must not directly execute ${fn}`);
     }
 
-    // Part 2 audit: strictly ONLY enforce_payment_adjustment_bounds uses SECURITY DEFINER, with locked search_path
+    // Strictly ONLY enforce_payment_adjustment_bounds uses SECURITY DEFINER, with locked search_path
     const secDefRes = await adminPool.query<{
       proname: string;
       prosecdef: boolean;
       proconfig: string[] | null;
+      owner_name: string;
     }>(
-      `SELECT p.proname, p.prosecdef, p.proconfig
+      `SELECT p.proname, p.prosecdef, p.proconfig, pg_get_userbyid(p.proowner) AS owner_name
        FROM pg_proc p
        JOIN pg_namespace n ON n.oid = p.pronamespace
        WHERE n.nspname = 'public' AND p.proname = ANY($1::text[])
@@ -210,6 +219,7 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
     );
     assert.equal(secDefRes.rows.length, funcs.length);
     for (const row of secDefRes.rows) {
+      assert.notEqual(row.owner_name, "npr_app_user", `${row.proname} must not be owned by npr_app_user`);
       if (row.proname === "enforce_payment_adjustment_bounds") {
         assert.equal(row.prosecdef, true, "enforce_payment_adjustment_bounds must be SECURITY DEFINER");
         assert.ok(
@@ -222,7 +232,7 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
     }
   });
 
-  it("11. Confirms RLS is enabled on all 13 tables, security_invoker=true on all 4 views, and npr_app_user is NOBYPASSRLS", async () => {
+  it("11. Confirms RLS is enabled on all 13 tables, security_invoker=true on all 4 views, and npr_app_user least-privilege attributes & ownership", async () => {
     const rlsRes = await adminPool.query<{ relname: string; relrowsecurity: boolean }>(
       `SELECT c.relname, c.relrowsecurity
        FROM pg_class c
@@ -250,32 +260,155 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
     }
 
     const roleFlags = await adminPool.query<{
+      oid: number;
+      rolcanlogin: boolean;
       rolsuper: boolean;
       rolcreatedb: boolean;
       rolcreaterole: boolean;
+      rolreplication: boolean;
       rolbypassrls: boolean;
     }>(
-      `SELECT rolsuper, rolcreatedb, rolcreaterole, rolbypassrls
+      `SELECT oid, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
        FROM pg_roles WHERE rolname = 'npr_app_user'`
     );
-    assert.equal(roleFlags.rows[0].rolsuper, false);
-    assert.equal(roleFlags.rows[0].rolcreatedb, false);
-    assert.equal(roleFlags.rows[0].rolcreaterole, false);
-    assert.equal(roleFlags.rows[0].rolbypassrls, false);
+    assert.equal(roleFlags.rows.length, 1);
+    const rf = roleFlags.rows[0];
+    assert.equal(rf.rolcanlogin, true);
+    assert.equal(rf.rolsuper, false);
+    assert.equal(rf.rolcreatedb, false);
+    assert.equal(rf.rolcreaterole, false);
+    assert.equal(rf.rolreplication, false);
+    assert.equal(rf.rolbypassrls, false);
+
+    // Zero role memberships & zero owned objects in public
+    const memCount = await adminPool.query<{ cnt: number }>(
+      "SELECT COUNT(*)::int AS cnt FROM pg_auth_members WHERE member = $1",
+      [rf.oid]
+    );
+    assert.equal(memCount.rows[0].cnt, 0, "npr_app_user must hold zero role memberships");
+
+    const ownedCount = await adminPool.query<{ cnt: number }>(
+      `SELECT COUNT(*)::int AS cnt
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relowner = $1`,
+      [rf.oid]
+    );
+    assert.equal(ownedCount.rows[0].cnt, 0, "npr_app_user must own zero relations in public");
+
+    // Verify no schema CREATE grant and no excess table/sequence privileges
+    const createPriv = await adminPool.query<{ has_create: boolean }>(
+      "SELECT has_schema_privilege('npr_app_user', 'public', 'CREATE') AS has_create"
+    );
+    assert.equal(createPriv.rows[0].has_create, false, "npr_app_user must NOT have CREATE on schema public");
+
+    const dangerousGrants = await adminPool.query<{ table_name: string; privilege_type: string }>(
+      `SELECT table_name, privilege_type
+       FROM information_schema.role_table_grants
+       WHERE grantee = 'npr_app_user' AND table_schema = 'public'
+         AND privilege_type IN ('TRUNCATE', 'REFERENCES', 'TRIGGER')`
+    );
+    assert.equal(dangerousGrants.rows.length, 0);
+
+    const deleteGrants = await adminPool.query<{ table_name: string }>(
+      `SELECT DISTINCT table_name
+       FROM information_schema.role_table_grants
+       WHERE grantee = 'npr_app_user' AND table_schema = 'public' AND privilege_type = 'DELETE'
+       ORDER BY table_name`
+    );
+    assert.deepEqual(
+      deleteGrants.rows.map((r) => r.table_name),
+      ["idempotency_records", "user_sessions"],
+      "DELETE must only be granted on user_sessions and idempotency_records"
+    );
+
+    const matSeqPriv = await adminPool.query<{ u: boolean }>(
+      "SELECT has_sequence_privilege('npr_app_user', 'public.materials_id_seq', 'USAGE') AS u"
+    );
+    assert.equal(matSeqPriv.rows[0].u, false, "npr_app_user must not have USAGE on materials_id_seq");
   });
 
-  it("5, 6, 7, 8, 9 & 10. npr_app_user executes full backend workflows under NOBYPASSRLS while forbidden actions remain blocked", async () => {
+  it("5, 6, 7, 8, 9 & 10. npr_app_user executes full backend workflows under NOBYPASSRLS while DDL, trigger bypass, and forbidden mutations remain blocked", async () => {
     assert.ok(appUserPool);
 
-    // 7. Session create & delete
+    // Repeated execution of provisioning policy helper is safe & idempotent
+    const policySql = await readFile(POLICY_SCRIPT_PATH, "utf8");
+    await adminPool.query(policySql);
+
+    // DDL, trigger disable, and replication-role trigger bypass MUST fail
+    await assert.rejects(
+      () => appUserPool!.query("ALTER TABLE invoices DISABLE TRIGGER ALL"),
+      /must be owner of table invoices|permission denied/i
+    );
+    await assert.rejects(
+      () => appUserPool!.query("ALTER TABLE invoices ADD COLUMN evil_col TEXT"),
+      /must be owner of table invoices|permission denied/i
+    );
+    await assert.rejects(
+      () => appUserPool!.query("SET session_replication_role = 'replica'"),
+      /permission denied to set parameter "session_replication_role"/i
+    );
+
+    // Sequence tampering blocked
+    await assert.rejects(
+      () => appUserPool!.query("SELECT setval('public.invoice_number_seq', 1)"),
+      /permission denied for sequence invoice_number_seq/i
+    );
+    await assert.rejects(
+      () => appUserPool!.query("SELECT nextval('public.materials_id_seq')"),
+      /permission denied for sequence materials_id_seq/i
+    );
+
+    // Session create, sliding expires_at update, and revocation (including active session delete) succeed;
+    // mutating user_id / token_hash fails
     const sHash = sha256(randomUUID());
     await appUserPool!.query(
       "INSERT INTO user_sessions (token_hash, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL '1 hour')",
       [sHash, cashierId]
     );
-    await appUserPool!.query("DELETE FROM user_sessions WHERE token_hash = $1", [sHash]);
+    await appUserPool!.query(
+      "UPDATE user_sessions SET expires_at = NOW() + INTERVAL '2 hours' WHERE token_hash = $1",
+      [sHash]
+    );
+    await assert.rejects(
+      () => appUserPool!.query("UPDATE user_sessions SET user_id = $1 WHERE token_hash = $2", [ownerId, sHash]),
+      /permission denied for table user_sessions/i
+    );
+    await assert.rejects(
+      () => appUserPool!.query("UPDATE user_sessions SET token_hash = $1 WHERE token_hash = $2", [sha256("tamper"), sHash]),
+      /permission denied for table user_sessions/i
+    );
+    const rev = await appUserPool!.query("DELETE FROM user_sessions WHERE token_hash = $1", [sHash]);
+    assert.equal(rev.rowCount, 1);
 
-    // 8. Invoice creation, finalization & 9. append-only payment under RLS
+    // Materials price read & owner update blocked for INSERT
+    const matRead = await appUserPool!.query<{ current_unit_price: string }>(
+      "SELECT current_unit_price FROM materials WHERE id = $1",
+      [matId]
+    );
+    assert.equal(matRead.rows[0].current_unit_price, "9500.00");
+    await assert.rejects(
+      () =>
+        appUserPool!.query(
+          "INSERT INTO materials (code, name, unit, current_unit_price) VALUES ('UNAUTH', 'Unauth', 'm³', 100.00)"
+        ),
+      /permission denied for table materials/i
+    );
+
+    // Invoice creation, finalization & append-only payment under RLS
+    // Direct ISSUED insert rejected by RLS
+    await assert.rejects(
+      () =>
+        appUserPool!.query(
+          `INSERT INTO invoices (
+             customer_id, customer_name_snapshot, customer_phone_snapshot, customer_location_snapshot,
+             has_transport, transport_fee, subtotal, grand_total, status, issued_by_user_id, issued_at
+           ) VALUES ($1, 'Bypass Co', '0771112223', 'Colombo', false, 0.00, 0.00, 0.00, 'ISSUED', $2, NOW())`,
+          [custId, cashierId]
+        ),
+      /violates row-level security policy|DRAFT status/i
+    );
+
     const c = await appUserPool!.connect();
     let invId = "";
     let payId = "";
@@ -308,27 +441,69 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
       c.release();
     }
 
-    // Reporting view with security_invoker=true succeeds for npr_app_user
+    // All 4 reporting views with security_invoker=true succeed for npr_app_user
     const ledger = await appUserPool!.query<{ balance_due: string }>(
       "SELECT balance_due FROM invoice_ledger_view WHERE invoice_id = $1",
       [invId]
     );
     assert.equal(ledger.rows[0].balance_due, "9000.00");
 
-    // 6 & 9. Forbidden mutations blocked by RLS / grants / triggers
-    await assert.rejects(
-      () => appUserPool!.query("SELECT * FROM public.pgmigrations"),
-      /permission denied/i
+    const dailyView = await appUserPool!.query(
+      "SELECT business_date, gross_recorded_receipts FROM daily_cash_reconciliation_view LIMIT 1"
     );
-    await assert.rejects(
-      () => appUserPool!.query("UPDATE payments SET amount = 1.00 WHERE id = $1", [payId]),
-      /permission denied|append-only/i
-    );
-    await assert.rejects(
-      () => appUserPool!.query("DELETE FROM payments WHERE id = $1", [payId]),
-      /permission denied/i
-    );
+    assert.ok(dailyView.rows.length >= 1);
 
+    const shiftView = await appUserPool!.query(
+      "SELECT user_id, gross_recorded_receipts FROM cashier_shift_reconciliation_view WHERE user_id = $1",
+      [cashierId]
+    );
+    assert.ok(shiftView.rows.length >= 1);
+
+    const custView = await appUserPool!.query(
+      "SELECT outstanding_balance FROM customer_balances_view WHERE customer_id = $1",
+      [custId]
+    );
+    assert.equal(custView.rows.length, 1);
+
+    // pgmigrations history completely inaccessible
+    for (const badMigSql of [
+      "SELECT * FROM public.pgmigrations",
+      "INSERT INTO public.pgmigrations (name, run_on) VALUES ('999_fake', NOW())",
+      "UPDATE public.pgmigrations SET name = 'tamper'",
+      "DELETE FROM public.pgmigrations",
+      "TRUNCATE public.pgmigrations",
+    ]) {
+      await assert.rejects(
+        () => appUserPool!.query(badMigSql),
+        /permission denied/i,
+        `npr_app_user must be denied: ${badMigSql}`
+      );
+    }
+
+    // Forbidden UPDATE/DELETE across protected financial & identity tables
+    for (const forbiddenStmt of [
+      { sql: "UPDATE payments SET amount = 1.00 WHERE id = $1", params: [payId] },
+      { sql: "DELETE FROM payments WHERE id = $1", params: [payId] },
+      { sql: "DELETE FROM invoices WHERE id = $1", params: [invId] },
+      { sql: "UPDATE invoices SET customer_name_snapshot = 'Tamper' WHERE id = $1", params: [invId] },
+      { sql: "DELETE FROM invoice_items WHERE invoice_id = $1", params: [invId] },
+      { sql: "UPDATE invoice_items SET quantity = 99 WHERE invoice_id = $1", params: [invId] },
+      { sql: "UPDATE users SET role = 'OWNER' WHERE id = $1", params: [cashierId] },
+      { sql: "DELETE FROM users WHERE id = $1", params: [cashierId] },
+      { sql: "DELETE FROM customers WHERE id = $1", params: [custId] },
+      { sql: "DELETE FROM credit_notes", params: [] },
+      { sql: "DELETE FROM payment_adjustments", params: [] },
+      { sql: "DELETE FROM material_price_history", params: [] },
+      { sql: "DELETE FROM audit_logs", params: [] },
+    ]) {
+      await assert.rejects(
+        () => appUserPool!.query(forbiddenStmt.sql, forbiddenStmt.params),
+        /permission denied|append-only|immutable|cannot be deleted/i,
+        `Expected rejection for: ${forbiddenStmt.sql}`
+      );
+    }
+
+    // Active unexpired idempotency record DELETE blocked by RLS
     const activeKey = randomUUID();
     await appUserPool!.query(
       `INSERT INTO idempotency_records (idempotency_key, operation_type, request_hash, actor_user_id, response_status, response_payload)
@@ -341,7 +516,7 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
     );
     assert.equal(delActive.rowCount, 0, "RLS policy must prevent deleting active unexpired idempotency keys");
 
-    // 10. Owner check enforced even by RLS policy BEFORE trigger
+    // Owner checks enforced by BOTH RLS policy AND triggers on payment_adjustments & credit_notes
     await assert.rejects(
       () =>
         appUserPool!.query(
@@ -360,17 +535,60 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
        VALUES ($1, $2, $3, 'ENTRY_REVERSAL', 1000.00, $4, 'Owner authorized entry adjustment under RLS')`,
       [payId, ownerId, ownerId, randomUUID()]
     );
+
+    // Authorized owner full credit note + invoice cancellation works under npr_app_user
+    await assert.rejects(
+      () =>
+        appUserPool!.query(
+          `INSERT INTO credit_notes (invoice_id, authorized_by_owner_id, credit_amount, excess_cash_resolution, idempotency_key, reason)
+           VALUES ($1, $2, 19000.00, 'PENDING_CUSTOMER_REFUND', $3, 'Cashier credit note blocked')`,
+          [invId, cashierId, randomUUID()]
+        ),
+      /violates row-level security policy|Only active OWNER/i
+    );
+
+    const cancelClient = await appUserPool!.connect();
+    try {
+      await cancelClient.query("BEGIN");
+      await cancelClient.query(
+        `INSERT INTO credit_notes (invoice_id, authorized_by_owner_id, credit_amount, excess_cash_resolution, idempotency_key, reason)
+         VALUES ($1, $2, 19000.00, 'PENDING_CUSTOMER_REFUND', $3, 'Owner approved cancellation credit note')`,
+        [invId, ownerId, randomUUID()]
+      );
+      await cancelClient.query(
+        "UPDATE invoices SET status = 'CANCELLED' WHERE id = $1",
+        [invId]
+      );
+      await cancelClient.query("COMMIT");
+    } finally {
+      cancelClient.release();
+    }
   });
 
-  it("12. Future tables and views created after 006 do not grant privileges to anon or authenticated", async () => {
+  it("12 & 19. Future objects do not expose to anon/authenticated and unrelated private schemas deny npr_app_user", async () => {
     const probeSuffix = randomUUID().slice(0, 6);
     const tbl = `future_probe_${probeSuffix}`;
     const vw = `future_probe_view_${probeSuffix}`;
+    const extSchema = `auth_sim_${probeSuffix}`;
 
     await adminPool.query(`CREATE TABLE public.${tbl} (id INT PRIMARY KEY, secret TEXT)`);
     await adminPool.query(`CREATE VIEW public.${vw} AS SELECT id, secret FROM public.${tbl}`);
+    await adminPool.query(`CREATE SCHEMA ${extSchema}`);
+    await adminPool.query(`REVOKE ALL ON SCHEMA ${extSchema} FROM PUBLIC`);
+    await adminPool.query(`CREATE TABLE ${extSchema}.internal_secrets (id INT PRIMARY KEY)`);
 
     try {
+      // Unrelated private schema denied for npr_app_user
+      const schemaPriv = await adminPool.query<{ can_use: boolean }>(
+        "SELECT has_schema_privilege('npr_app_user', $1, 'USAGE') AS can_use",
+        [extSchema]
+      );
+      assert.equal(schemaPriv.rows[0].can_use, false);
+      await assert.rejects(
+        () => appUserPool!.query(`SELECT * FROM ${extSchema}.internal_secrets`),
+        /permission denied for schema/i
+      );
+
       for (const roleName of ["anon", "authenticated"]) {
         const client = await adminPool.connect();
         try {
@@ -408,6 +626,7 @@ describe("Phase 2B3B — PostgreSQL 17 Supabase Security Hardening & RLS Tests",
         }
       }
     } finally {
+      await adminPool.query(`DROP SCHEMA IF EXISTS ${extSchema} CASCADE`);
       await adminPool.query(`DROP VIEW IF EXISTS public.${vw}`);
       await adminPool.query(`DROP TABLE IF EXISTS public.${tbl}`);
     }

@@ -91,10 +91,84 @@ Run read-only verification checks after `migrate:up` completes:
 
 ---
 
-## 5. Dedicated Restricted Runtime Role (`npr_app_user`) Strategy
+## 5. Dedicated Restricted Runtime Role (`npr_app_user`) Provisioning Runbook (Phase 2C)
 
-Once initial schema deployment is verified and Express backend connectivity is ready to drop elevated `postgres` credentials:
+Execute this procedure **only after** migrations `001`–`006` are verified as `[APPLIED]` and TLS `sslmode=verify-full` + pre-change logical backups are confirmed.
 
-1. DBA manually creates `npr_app_user` (`LOGIN`, `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOREPLICATION`, `NOBYPASSRLS`) with a high-entropy password (never committed to Git).
-2. DBA executes `database/scripts/apply_runtime_role_policies.sql` to apply column-restricted `GRANT`s and operation-scoped RLS policies compatible with `NOBYPASSRLS`.
-3. Update runtime backend environment credentials to connect as `npr_app_user` with `sslmode=verify-full` while reserving `postgres` exclusively for schema migrations.
+### 5.1 Pre-Flight Verification (Read-Only)
+Confirm the intended database identity, role state, `scram-sha-256` encryption, and migration status before making changes:
+
+```sql
+SELECT current_database(), current_user, version();
+SHOW password_encryption; -- Expect 'scram-sha-256'
+SELECT name, run_on FROM public.pgmigrations ORDER BY id;
+SELECT rolname FROM pg_roles WHERE rolname = 'npr_app_user'; -- Expect 0 rows prior to first provisioning
+```
+
+Abort immediately if migrations `001`–`006` are incomplete or if `current_database()` is not `postgres`.
+
+### 5.2 Staged Role Provisioning & Non-Logged Password Setup
+1. **Create role initially with `NOLOGIN` (no plaintext secret in SQL):**
+   In Supabase Dashboard SQL Editor or `psql` (connected as `postgres` over Session Pooler port `5432` with `sslmode=verify-full`):
+   ```sql
+   CREATE ROLE npr_app_user WITH
+     NOLOGIN
+     NOSUPERUSER
+     NOCREATEDB
+     NOCREATEROLE
+     NOREPLICATION
+     NOINHERIT
+     NOBYPASSRLS;
+   ```
+2. **Apply transactional least-privilege grants & RLS policies while `NOLOGIN`:**
+   Execute `database/scripts/apply_runtime_role_policies.sql` inside its `BEGIN ... COMMIT` block. It fails safely if `npr_app_user` holds elevated flags, role memberships, or `public` object ownership, or if migrations `001`–`006` hardening is missing.
+3. **Verify grants & RLS before enabling login:** Confirm role flags, `0` memberships, `29` policies, `public_create = false`, and `pgmigrations` `SELECT = false` (queries in §5.3).
+4. **Set a strong SCRAM-SHA-256 password without plaintext logs or terminal history:**
+   - Generate a URL-safe secret directly in memory or interactive session, or use `psql`'s masked prompt (`SET password_encryption = 'scram-sha-256'; \password npr_app_user`) so the secret is never written to Git, shell history, or logs. Avoid URI-reserved characters (`@`, `#`, `:`, `?`, `/`) or percent-encode them strictly.
+5. **Enable `LOGIN` only after security verification passes:**
+   ```sql
+   ALTER ROLE npr_app_user WITH LOGIN VALID UNTIL 'infinity';
+   ```
+
+### 5.3 Post-Provisioning Verification Queries (Read-Only)
+Verify privileges (before enabling `LOGIN` and again after enabling `LOGIN`), and allow 15–30 seconds for Supavisor auth cache propagation before testing client connections:
+
+```sql
+SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls, rolvaliduntil
+FROM pg_roles WHERE rolname = 'npr_app_user';
+
+SELECT COUNT(*) AS membership_count
+FROM pg_auth_members
+WHERE member = (SELECT oid FROM pg_roles WHERE rolname = 'npr_app_user'); -- Expect 0
+
+SELECT COUNT(*) AS rls_policy_count
+FROM pg_policies
+WHERE schemaname = 'public' AND 'npr_app_user' = ANY(roles); -- Expect 29
+
+SELECT
+  has_schema_privilege('npr_app_user', 'public', 'USAGE') AS public_usage,   -- true
+  has_schema_privilege('npr_app_user', 'public', 'CREATE') AS public_create, -- false
+  has_table_privilege('npr_app_user', 'public.pgmigrations', 'SELECT') AS mig_select; -- false
+```
+
+---
+
+## 6. Supavisor Connection Separation & Recovery Procedure
+
+### 6.1 Supavisor Custom-Role Connection Format
+Supabase Supavisor (Session Pooler port `5432`) requires tenant-scoped usernames (`<ROLE>.<PROJECT_REF>`) and explicit `/postgres` database target:
+- **Runtime API (`DATABASE_URL`):**
+  `postgresql://npr_app_user.<PROJECT_REF>:<URL_SAFE_PASSWORD>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=C:/Users/<YourWindowsUsername>/.postgresql/prod-ca-2021.crt`
+- **Schema Migrations (`MIGRATION_DATABASE_URL`):**
+  `postgresql://postgres.<PROJECT_REF>:<MIGRATION_PASSWORD>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=C:/Users/<YourWindowsUsername>/.postgresql/prod-ca-2021.crt`
+
+### 6.2 Backwards-Compatible Transition & Cutover Order
+1. **Pre-Cutover Transition (Non-Production Only):** While `MIGRATION_DATABASE_URL` is unset, `DATABASE_URL` (`postgres.<PROJECT_REF>`) remains temporarily backwards-compatible in development (`server.ts` logs a non-secret warning). In `NODE_ENV=production`, startup strictly rejects elevated roles and requires `npr_app_user` + `sslmode=verify-full`.
+2. **Cutover:** Complete §5 (`NOLOGIN` -> `apply_runtime_role_policies.sql` -> read-only verify -> non-logged password -> `LOGIN`), then update `backend/.env` so `MIGRATION_DATABASE_URL` holds `postgres.<PROJECT_REF>` and `DATABASE_URL` holds `npr_app_user.<PROJECT_REF>`.
+3. **Runtime Guarantee:** `backend/src/db/pool.ts` strictly reads `DATABASE_URL` (never `MIGRATION_DATABASE_URL`). Once `MIGRATION_DATABASE_URL` is configured, `getRuntimeDatabaseUrl()` also refuses privileged roles in `DATABASE_URL`. `run-migrations.ts` and `migration-status.ts` refuse `npr_app_user`.
+4. **Post-Cutover Verification:** Run `npm --prefix backend run db:check` (verifying `npr_app_user.<PROJECT_REF>`) and `npm --prefix backend run migrate:status` (verifying `[APPLIED]` `001`–`006` via `MIGRATION_DATABASE_URL`).
+
+### 6.3 Safe Recovery / Rollback Procedure
+- **If `28P01` auth failure occurs immediately after creation:** Wait 30 seconds for Supavisor cache refresh, confirm `rolcanlogin = true` and `VALID UNTIL 'infinity'`, and re-run `SET password_encryption = 'scram-sha-256'; ALTER ROLE npr_app_user WITH PASSWORD '...';`.
+- **If an emergency backend rollback is required:** Temporarily restore `postgres.<PROJECT_REF>` in `DATABASE_URL` (keeping `sslmode=verify-full`) while diagnosing missing grants; never bypass RLS via `ALTER ROLE ... BYPASSRLS`.
+- **To disable or rotate `npr_app_user` immediately:** Run `ALTER ROLE npr_app_user NOLOGIN;` or rotate the password out-of-band without re-running migrations.
