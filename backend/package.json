@@ -6,6 +6,7 @@
   "scripts": {
     "test": "tsx --test src/tests/**/*.test.ts",
     "test:db": "tsx --test src/tests/db-integrity.test.ts",
+    "test:security": "tsx --test src/tests/db-security-rls.test.ts",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
