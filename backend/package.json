@@ -4,12 +4,18 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "tsx --test src/tests/**/*.test.ts",
+    "test:db": "tsx --test src/tests/db-integrity.test.ts",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "db:check": "tsx src/scripts/check-db.ts"
+    "db:check": "tsx src/scripts/check-db.ts",
+    "migrate:check": "tsx src/scripts/check-migrations.ts",
+    "migrate:status": "tsx src/scripts/migration-status.ts",
+    "migrate:dry-run": "node-pg-migrate up -m ../database/migrations --envPath .env --check-order --single-transaction --dry-run",
+    "migrate:up": "node-pg-migrate up -m ../database/migrations --envPath .env --check-order --single-transaction",
+    "migrate:create": "node-pg-migrate create -m ../database/migrations -j sql --migration-filename-format index"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +30,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
+    "node-pg-migrate": "^9.0.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
