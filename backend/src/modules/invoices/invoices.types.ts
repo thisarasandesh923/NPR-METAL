@@ -50,9 +50,23 @@ export interface InvoiceSummaryDto {
   businessDate: string;
 }
 
+export interface InvoicePaymentAdjustmentDto {
+  id: number;
+  adjustmentNumber: string;
+  paymentId: number;
+  receiptNumber: string;
+  adjustmentType: "ENTRY_REVERSAL" | "CASH_REFUND";
+  adjustmentAmount: string;
+  reason: string;
+  authorizedByOwnerId: string;
+  authorizedByOwnerName: string;
+  createdAt: string;
+}
+
 export interface InvoiceDetailDto extends InvoiceSummaryDto {
   items: InvoiceItemDto[];
   payments: InvoicePaymentDto[];
+  adjustments?: InvoicePaymentAdjustmentDto[];
 }
 
 export interface CreateInvoiceItemInput {
@@ -75,3 +89,4 @@ export interface CreateInvoiceInput {
   initialPaymentNotes?: string | null;
   idempotencyKey: string;
 }
+

@@ -16,6 +16,18 @@ export function createMaterialsRouter(
     requireRole("OWNER", "CASHIER"),
     controller.listActive
   );
+  router.get(
+    "/price-history",
+    requireAuth,
+    requireRole("OWNER"),
+    controller.listHistory
+  );
+  router.put(
+    "/:id/price",
+    requireAuth,
+    requireRole("OWNER"),
+    controller.updatePrice
+  );
 
   return router;
 }

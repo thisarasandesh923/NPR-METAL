@@ -8,11 +8,16 @@ interface HeaderProps {
 }
 
 const SCREEN_TITLES: Record<AppScreen, string> = {
-  "owner-dashboard": "Owner Overview",
+  "owner-dashboard": "Owner Overview & Reports",
   "cashier-dashboard": "Cashier Dashboard",
   "new-invoice": "New Invoice",
   invoices: "Invoice History",
   "invoice-detail": "Invoice Details",
+  "material-prices": "Material Price Management",
+  "daily-operations": "Daily Workshop Operations",
+  approvals: "Owner Approvals Queue",
+  "workers-machines": "Workers & Machines",
+  payroll: "Payroll & Expenses (Owner Only)",
 };
 
 function formatColomboDate(): string {

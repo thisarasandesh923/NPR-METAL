@@ -11,6 +11,7 @@ import {
   requireCsrfHeaderMiddleware,
   securityHeadersMiddleware,
 } from "./middleware/security.middleware.js";
+import { createApprovalsRouter } from "./modules/approvals/approvals.routes.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
 import { AuthService } from "./modules/auth/auth.service.js";
 import type { UserRole } from "./modules/auth/auth.types.js";
@@ -18,12 +19,20 @@ import { createCustomersRouter } from "./modules/customers/customers.routes.js";
 import { CustomersService } from "./modules/customers/customers.service.js";
 import { createInvoicesRouter } from "./modules/invoices/invoices.routes.js";
 import { InvoicesService } from "./modules/invoices/invoices.service.js";
+import { createMachinesRouters } from "./modules/machines/machines.routes.js";
+import { MachinesService } from "./modules/machines/machines.service.js";
 import { createMaterialsRouter } from "./modules/materials/materials.routes.js";
 import { MaterialsService } from "./modules/materials/materials.service.js";
 import { createPaymentsRouter } from "./modules/payments/payments.routes.js";
 import { PaymentsService } from "./modules/payments/payments.service.js";
+import { createPayrollRouters } from "./modules/payroll/payroll.routes.js";
+import { PayrollService } from "./modules/payroll/payroll.service.js";
+import { createProductionRouter } from "./modules/production/production.routes.js";
+import { ProductionService } from "./modules/production/production.service.js";
 import { createReportsRouter } from "./modules/reports/reports.routes.js";
 import { ReportsService } from "./modules/reports/reports.service.js";
+import { createWorkersRouters } from "./modules/workers/workers.routes.js";
+import { WorkersService } from "./modules/workers/workers.service.js";
 
 export interface AppDependencies {
   pool: Pool;
@@ -89,6 +98,33 @@ export function createApp(deps: AppDependencies): Express {
     "/api/reports",
     createReportsRouter(new ReportsService(deps.pool), requireAuth)
   );
+
+  const { workersRouter, attendanceRouter } = createWorkersRouters(
+    new WorkersService(deps.pool),
+    requireAuth
+  );
+  app.use("/api/workers", workersRouter);
+  app.use("/api/attendance", attendanceRouter);
+
+  const { machinesRouter, machineLogsRouter } = createMachinesRouters(
+    new MachinesService(deps.pool),
+    requireAuth
+  );
+  app.use("/api/machines", machinesRouter);
+  app.use("/api/machine-logs", machineLogsRouter);
+
+  app.use(
+    "/api/production",
+    createProductionRouter(new ProductionService(deps.pool), requireAuth)
+  );
+  app.use("/api/approvals", createApprovalsRouter(deps.pool, requireAuth));
+
+  const { payrollRouter, expensesRouter } = createPayrollRouters(
+    new PayrollService(deps.pool),
+    requireAuth
+  );
+  app.use("/api/payroll", payrollRouter);
+  app.use("/api/expenses", expensesRouter);
 
   if (deps.registerExtraRoutes) {
     if (

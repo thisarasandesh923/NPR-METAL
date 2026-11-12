@@ -5,6 +5,8 @@ export interface MaterialCatalogItem {
   unit: string;
   currentUnitPrice: string;
   isActive: boolean;
+  version?: number;
+  updatedAt?: string;
 }
 
 export interface CustomerRecord {
@@ -66,9 +68,23 @@ export interface InvoiceSummary {
   businessDate: string;
 }
 
+export interface InvoicePaymentAdjustmentRecord {
+  id: number;
+  adjustmentNumber: string;
+  paymentId: number;
+  receiptNumber: string;
+  adjustmentType: "ENTRY_REVERSAL" | "CASH_REFUND";
+  adjustmentAmount: string;
+  reason: string;
+  authorizedByOwnerId: string;
+  authorizedByOwnerName: string;
+  createdAt: string;
+}
+
 export interface InvoiceDetail extends InvoiceSummary {
   items: InvoiceItemRecord[];
   payments: InvoicePaymentRecord[];
+  adjustments?: InvoicePaymentAdjustmentRecord[];
 }
 
 export interface OwnerOverviewMetrics {
@@ -107,3 +123,4 @@ export interface RecordPaymentRequest {
   idempotencyKey: string;
   notes?: string | null;
 }
+

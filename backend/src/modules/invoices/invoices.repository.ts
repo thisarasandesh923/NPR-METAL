@@ -137,7 +137,15 @@ export async function insertIdempotencyRecord(
   client: PoolClient,
   params: {
     idempotencyKey: string;
-    operationType: "ISSUE_INVOICE" | "RECORD_PAYMENT";
+    operationType:
+      | "ISSUE_INVOICE"
+      | "RECORD_PAYMENT"
+      | "PAYMENT_ADJUSTMENT"
+      | "ISSUE_CREDIT_NOTE"
+      | "UPDATE_MATERIAL_PRICE"
+      | "RECORD_WORKER_ADVANCE"
+      | "RECORD_SALARY_PAYMENT"
+      | "RECORD_EXPENSE";
     requestHash: string;
     actorUserId: string;
     responseStatus: number;
@@ -403,9 +411,52 @@ export async function findInvoiceDetailById(
     createdAt: p.created_at.toISOString(),
   }));
 
+  const adjRes = await client.query<{
+    id: string | number;
+    adjustment_number: string;
+    payment_id: string | number;
+    receipt_number: string;
+    adjustment_type: "ENTRY_REVERSAL" | "CASH_REFUND";
+    adjustment_amount: string;
+    reason: string;
+    authorized_by_owner_id: string;
+    authorized_by_owner_name: string;
+    created_at: Date;
+  }>(
+    `SELECT
+       pa.id,
+       pa.adjustment_number,
+       pa.payment_id,
+       p.receipt_number,
+       pa.adjustment_type,
+       pa.adjustment_amount::text AS adjustment_amount,
+       pa.reason,
+       pa.authorized_by_owner_id,
+       u.full_name AS authorized_by_owner_name,
+       pa.created_at
+     FROM public.payment_adjustments pa
+     JOIN public.payments p ON p.id = pa.payment_id
+     JOIN public.users u ON u.id = pa.authorized_by_owner_id
+     WHERE p.invoice_id = $1
+     ORDER BY pa.created_at ASC, pa.id ASC`,
+    [invoiceId]
+  );
+
   return {
     ...mapSummaryRow(header),
     items,
     payments,
+    adjustments: adjRes.rows.map((a) => ({
+      id: Number(a.id),
+      adjustmentNumber: a.adjustment_number,
+      paymentId: Number(a.payment_id),
+      receiptNumber: a.receipt_number,
+      adjustmentType: a.adjustment_type,
+      adjustmentAmount: a.adjustment_amount,
+      reason: a.reason,
+      authorizedByOwnerId: a.authorized_by_owner_id,
+      authorizedByOwnerName: a.authorized_by_owner_name,
+      createdAt: a.created_at.toISOString(),
+    })),
   };
 }

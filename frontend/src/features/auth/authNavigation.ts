@@ -4,17 +4,23 @@ import type { IconName } from "../../types/invoice.ts";
 export interface RoleNavItem {
   label: string;
   icon: IconName;
-  screen?: AppScreen;
-  badge?: "Planned";
-  disabled?: boolean;
+  screen: AppScreen;
 }
+
+const OWNER_ONLY_SCREENS = new Set<AppScreen>([
+  "owner-dashboard",
+  "material-prices",
+  "approvals",
+  "workers-machines",
+  "payroll",
+]);
 
 export function getDefaultScreenForRole(role: UserRole): AppScreen {
   return role === "OWNER" ? "owner-dashboard" : "cashier-dashboard";
 }
 
 export function canAccessScreen(role: UserRole, screen: AppScreen): boolean {
-  if (screen === "owner-dashboard") {
+  if (OWNER_ONLY_SCREENS.has(screen)) {
     return role === "OWNER";
   }
   return role === "OWNER" || role === "CASHIER";
@@ -39,6 +45,31 @@ export function getNavItemsForRole(role: UserRole): RoleNavItem[] {
         screen: "owner-dashboard",
       },
       {
+        label: "Approvals Queue",
+        icon: "check",
+        screen: "approvals",
+      },
+      {
+        label: "Price Management",
+        icon: "balance",
+        screen: "material-prices",
+      },
+      {
+        label: "Daily Operations",
+        icon: "documents",
+        screen: "daily-operations",
+      },
+      {
+        label: "Workers & Machines",
+        icon: "customers",
+        screen: "workers-machines",
+      },
+      {
+        label: "Payroll & Expenses",
+        icon: "payments",
+        screen: "payroll",
+      },
+      {
         label: "Invoice History",
         icon: "history",
         screen: "invoices",
@@ -47,18 +78,6 @@ export function getNavItemsForRole(role: UserRole): RoleNavItem[] {
         label: "New Invoice",
         icon: "invoice",
         screen: "new-invoice",
-      },
-      {
-        label: "Price Management",
-        icon: "balance",
-        badge: "Planned",
-        disabled: true,
-      },
-      {
-        label: "Operations & Payroll",
-        icon: "customers",
-        badge: "Planned",
-        disabled: true,
       },
     ];
   }
@@ -82,8 +101,7 @@ export function getNavItemsForRole(role: UserRole): RoleNavItem[] {
     {
       label: "Daily Operations",
       icon: "documents",
-      badge: "Planned",
-      disabled: true,
+      screen: "daily-operations",
     },
   ];
 }

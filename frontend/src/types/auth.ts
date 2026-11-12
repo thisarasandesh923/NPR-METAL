@@ -16,7 +16,12 @@ export type AppScreen =
   | "cashier-dashboard"
   | "new-invoice"
   | "invoices"
-  | "invoice-detail";
+  | "invoice-detail"
+  | "material-prices"
+  | "daily-operations"
+  | "approvals"
+  | "workers-machines"
+  | "payroll";
 
 export function isValidUserRole(value: unknown): value is UserRole {
   return value === "OWNER" || value === "CASHIER";

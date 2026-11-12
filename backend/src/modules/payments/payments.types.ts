@@ -5,6 +5,14 @@ export interface RecordPaymentInput {
   notes?: string | null;
 }
 
+export interface AdjustPaymentInput {
+  paymentId: number;
+  adjustmentType: "ENTRY_REVERSAL";
+  amount: string | number;
+  reason: string;
+  idempotencyKey: string;
+}
+
 export interface CreatedPaymentRow {
   id: string | number;
   receipt_number: string;
@@ -19,4 +27,14 @@ export interface InvoicePaymentBounds {
   creditedAmount: string;
   grossPaidAmount: string;
   adjustedAmount: string;
+}
+
+export interface LockedPaymentAdjustmentBounds {
+  paymentId: number;
+  receiptNumber: string;
+  invoiceId: number;
+  invoiceNumber: string;
+  invoiceStatus: string;
+  originalAmount: string;
+  priorAdjustedAmount: string;
 }

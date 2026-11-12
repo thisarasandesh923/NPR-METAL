@@ -173,6 +173,16 @@ GRANT UPDATE (name, phone, location, notes, updated_at) ON customers TO npr_app_
 
 GRANT SELECT ON materials TO npr_app_user;
 GRANT UPDATE (name, current_unit_price, is_active, updated_at) ON materials TO npr_app_user;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'materials' AND column_name = 'version'
+    ) THEN
+        GRANT UPDATE (version) ON materials TO npr_app_user;
+    END IF;
+END
+$$;
 GRANT SELECT, INSERT ON material_price_history TO npr_app_user;
 
 GRANT SELECT, INSERT ON invoices TO npr_app_user;
@@ -293,5 +303,130 @@ DROP POLICY IF EXISTS app_audit_logs_select ON audit_logs;
 DROP POLICY IF EXISTS app_audit_logs_insert ON audit_logs;
 CREATE POLICY app_audit_logs_select ON audit_logs FOR SELECT TO npr_app_user USING (true);
 CREATE POLICY app_audit_logs_insert ON audit_logs FOR INSERT TO npr_app_user WITH CHECK (true);
+
+-- 6. Conditional Grants & RLS Policies for Migration 008 Objects (Operations & Payroll)
+DO $$
+BEGIN
+    IF to_regclass('public.workers') IS NOT NULL THEN
+        REVOKE ALL ON FUNCTION
+            enforce_operational_approval_transition(),
+            enforce_owner_actor_for_finance(),
+            enforce_salary_payment_bounds()
+        FROM npr_app_user;
+
+        GRANT USAGE, SELECT ON SEQUENCE
+            advance_number_seq,
+            salary_receipt_number_seq,
+            expense_number_seq,
+            workers_id_seq,
+            worker_compensation_profiles_id_seq,
+            worker_attendance_id_seq,
+            machines_id_seq,
+            machine_work_logs_id_seq,
+            production_logs_id_seq,
+            operational_approval_history_id_seq,
+            payroll_periods_id_seq,
+            payroll_entries_id_seq,
+            worker_advances_id_seq,
+            salary_payments_id_seq,
+            operational_expenses_id_seq
+        TO npr_app_user;
+
+        GRANT SELECT, INSERT, UPDATE ON
+            workers,
+            worker_compensation_profiles,
+            worker_attendance,
+            machines,
+            machine_work_logs,
+            production_logs,
+            payroll_periods,
+            payroll_entries
+        TO npr_app_user;
+
+        GRANT SELECT, INSERT ON
+            operational_approval_history,
+            worker_advances,
+            salary_payments,
+            operational_expenses
+        TO npr_app_user;
+
+        DROP POLICY IF EXISTS app_workers_all ON workers;
+        CREATE POLICY app_workers_all ON workers FOR ALL TO npr_app_user USING (true) WITH CHECK (true);
+
+        DROP POLICY IF EXISTS app_worker_comp_all ON worker_compensation_profiles;
+        CREATE POLICY app_worker_comp_all ON worker_compensation_profiles FOR ALL TO npr_app_user
+            USING (true)
+            WITH CHECK (
+                EXISTS (
+                    SELECT 1 FROM users u
+                    WHERE u.id = updated_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                )
+            );
+
+        DROP POLICY IF EXISTS app_worker_attendance_all ON worker_attendance;
+        CREATE POLICY app_worker_attendance_all ON worker_attendance FOR ALL TO npr_app_user USING (true) WITH CHECK (true);
+
+        DROP POLICY IF EXISTS app_machines_all ON machines;
+        CREATE POLICY app_machines_all ON machines FOR ALL TO npr_app_user USING (true) WITH CHECK (true);
+
+        DROP POLICY IF EXISTS app_machine_logs_all ON machine_work_logs;
+        CREATE POLICY app_machine_logs_all ON machine_work_logs FOR ALL TO npr_app_user USING (true) WITH CHECK (true);
+
+        DROP POLICY IF EXISTS app_production_logs_all ON production_logs;
+        CREATE POLICY app_production_logs_all ON production_logs FOR ALL TO npr_app_user USING (true) WITH CHECK (true);
+
+        DROP POLICY IF EXISTS app_op_history_select ON operational_approval_history;
+        DROP POLICY IF EXISTS app_op_history_insert ON operational_approval_history;
+        CREATE POLICY app_op_history_select ON operational_approval_history FOR SELECT TO npr_app_user USING (true);
+        CREATE POLICY app_op_history_insert ON operational_approval_history FOR INSERT TO npr_app_user WITH CHECK (true);
+
+        DROP POLICY IF EXISTS app_payroll_periods_all ON payroll_periods;
+        CREATE POLICY app_payroll_periods_all ON payroll_periods FOR ALL TO npr_app_user
+            USING (true)
+            WITH CHECK (
+                EXISTS (
+                    SELECT 1 FROM users u
+                    WHERE u.id = created_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                )
+            );
+
+        DROP POLICY IF EXISTS app_payroll_entries_all ON payroll_entries;
+        CREATE POLICY app_payroll_entries_all ON payroll_entries FOR ALL TO npr_app_user USING (true) WITH CHECK (true);
+
+        DROP POLICY IF EXISTS app_worker_advances_select ON worker_advances;
+        DROP POLICY IF EXISTS app_worker_advances_insert ON worker_advances;
+        CREATE POLICY app_worker_advances_select ON worker_advances FOR SELECT TO npr_app_user USING (true);
+        CREATE POLICY app_worker_advances_insert ON worker_advances FOR INSERT TO npr_app_user
+            WITH CHECK (
+                EXISTS (
+                    SELECT 1 FROM users u
+                    WHERE u.id = authorized_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                )
+            );
+
+        DROP POLICY IF EXISTS app_salary_payments_select ON salary_payments;
+        DROP POLICY IF EXISTS app_salary_payments_insert ON salary_payments;
+        CREATE POLICY app_salary_payments_select ON salary_payments FOR SELECT TO npr_app_user USING (true);
+        CREATE POLICY app_salary_payments_insert ON salary_payments FOR INSERT TO npr_app_user
+            WITH CHECK (
+                EXISTS (
+                    SELECT 1 FROM users u
+                    WHERE u.id = paid_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                )
+            );
+
+        DROP POLICY IF EXISTS app_expenses_select ON operational_expenses;
+        DROP POLICY IF EXISTS app_expenses_insert ON operational_expenses;
+        CREATE POLICY app_expenses_select ON operational_expenses FOR SELECT TO npr_app_user USING (true);
+        CREATE POLICY app_expenses_insert ON operational_expenses FOR INSERT TO npr_app_user
+            WITH CHECK (
+                EXISTS (
+                    SELECT 1 FROM users u
+                    WHERE u.id = recorded_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                )
+            );
+    END IF;
+END
+$$;
 
 COMMIT;

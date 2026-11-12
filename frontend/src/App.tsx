@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MainLayout } from "./components/layout/MainLayout.tsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.tsx";
+import { OwnerApprovalsPage } from "./features/approvals/OwnerApprovalsPage.tsx";
 import {
   getDefaultScreenForRole,
   resolveAuthorizedScreen,
@@ -10,7 +11,11 @@ import { CashierDashboard } from "./features/dashboard/components/CashierDashboa
 import { InvoiceDetailPage } from "./features/invoices/components/InvoiceDetailPage.tsx";
 import { InvoiceHistoryPage } from "./features/invoices/components/InvoiceHistoryPage.tsx";
 import { NewInvoicePage } from "./features/invoices/components/NewInvoicePage.tsx";
+import { MaterialPricesPage } from "./features/materials/MaterialPricesPage.tsx";
+import { DailyOperationsPage } from "./features/operations/DailyOperationsPage.tsx";
+import { WorkersMachinesPage } from "./features/operations/WorkersMachinesPage.tsx";
 import { OwnerDashboard } from "./features/owner/components/OwnerDashboard.tsx";
+import { PayrollPage } from "./features/payroll/PayrollPage.tsx";
 import type { AppScreen } from "./types/auth.ts";
 
 export function AuthenticatedAppShell() {
@@ -77,8 +82,47 @@ export function AuthenticatedAppShell() {
                   user={user}
                   onOpenHistory={() => navigateTo("invoices")}
                   onSelectInvoice={openInvoice}
+                  onNavigate={(s) => navigateTo(s)}
                 />
               </ProtectedRoute>
+            ) : activeScreen === "approvals" ? (
+              <ProtectedRoute
+                allowedRoles={["OWNER"]}
+                onFallbackHome={() =>
+                  navigateTo(getDefaultScreenForRole(user.role))
+                }
+              >
+                <OwnerApprovalsPage />
+              </ProtectedRoute>
+            ) : activeScreen === "material-prices" ? (
+              <ProtectedRoute
+                allowedRoles={["OWNER"]}
+                onFallbackHome={() =>
+                  navigateTo(getDefaultScreenForRole(user.role))
+                }
+              >
+                <MaterialPricesPage />
+              </ProtectedRoute>
+            ) : activeScreen === "workers-machines" ? (
+              <ProtectedRoute
+                allowedRoles={["OWNER"]}
+                onFallbackHome={() =>
+                  navigateTo(getDefaultScreenForRole(user.role))
+                }
+              >
+                <WorkersMachinesPage />
+              </ProtectedRoute>
+            ) : activeScreen === "payroll" ? (
+              <ProtectedRoute
+                allowedRoles={["OWNER"]}
+                onFallbackHome={() =>
+                  navigateTo(getDefaultScreenForRole(user.role))
+                }
+              >
+                <PayrollPage />
+              </ProtectedRoute>
+            ) : activeScreen === "daily-operations" ? (
+              <DailyOperationsPage user={user} />
             ) : activeScreen === "new-invoice" ? (
               <NewInvoicePage
                 onCancel={() => navigateTo(getDefaultScreenForRole(user.role))}
@@ -92,6 +136,7 @@ export function AuthenticatedAppShell() {
               screenState.selectedInvoiceId !== undefined ? (
               <InvoiceDetailPage
                 invoiceId={screenState.selectedInvoiceId}
+                userRole={user.role}
                 onBack={() => navigateTo("invoices")}
                 onCreateAnother={() => navigateTo("new-invoice")}
               />
@@ -110,10 +155,12 @@ export function AuthenticatedAppShell() {
   );
 }
 
-export default function App() {
+export function App() {
   return (
     <AuthProvider>
       <AuthenticatedAppShell />
     </AuthProvider>
   );
 }
+
+export default App;

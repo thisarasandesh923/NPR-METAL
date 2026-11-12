@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import type {
   CreatedPaymentRow,
   InvoicePaymentBounds,
+  LockedPaymentAdjustmentBounds,
 } from "./payments.types.js";
 
 export async function lockInvoicePaymentBounds(
@@ -86,4 +87,95 @@ export async function insertCashPayment(
     ]
   );
   return res.rows[0];
+}
+
+export async function lockPaymentForAdjustment(
+  client: PoolClient,
+  paymentId: number
+): Promise<LockedPaymentAdjustmentBounds | null> {
+  const payRes = await client.query<{
+    id: string | number;
+    receipt_number: string;
+    invoice_id: string | number;
+    invoice_number: string;
+    invoice_status: string;
+    amount: string;
+  }>(
+    `SELECT
+       p.id,
+       p.receipt_number,
+       p.invoice_id,
+       i.invoice_number,
+       i.status AS invoice_status,
+       p.amount::text AS amount
+     FROM public.payments p
+     JOIN public.invoices i ON i.id = p.invoice_id
+     WHERE p.id = $1
+     FOR UPDATE OF i`,
+    [paymentId]
+  );
+
+  const row = payRes.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  const adjRes = await client.query<{ total: string }>(
+    `SELECT COALESCE(SUM(adjustment_amount), 0.00)::NUMERIC(12, 2)::text AS total
+     FROM public.payment_adjustments
+     WHERE payment_id = $1`,
+    [paymentId]
+  );
+
+  return {
+    paymentId: Number(row.id),
+    receiptNumber: row.receipt_number,
+    invoiceId: Number(row.invoice_id),
+    invoiceNumber: row.invoice_number,
+    invoiceStatus: row.invoice_status,
+    originalAmount: row.amount,
+    priorAdjustedAmount: adjRes.rows[0].total,
+  };
+}
+
+export async function insertPaymentAdjustment(
+  client: PoolClient,
+  params: {
+    paymentId: number;
+    ownerUserId: string;
+    adjustmentType: "ENTRY_REVERSAL";
+    adjustmentAmount: string;
+    reason: string;
+    idempotencyKey: string;
+  }
+): Promise<{ id: number; adjustment_number: string; created_at: Date }> {
+  const res = await client.query<{
+    id: string | number;
+    adjustment_number: string;
+    created_at: Date;
+  }>(
+    `INSERT INTO public.payment_adjustments (
+       payment_id,
+       authorized_by_owner_id,
+       performed_by_user_id,
+       adjustment_type,
+       adjustment_amount,
+       idempotency_key,
+       reason
+     ) VALUES ($1, $2, $2, $3, $4, $5, $6)
+     RETURNING id, adjustment_number, created_at`,
+    [
+      params.paymentId,
+      params.ownerUserId,
+      params.adjustmentType,
+      params.adjustmentAmount,
+      params.idempotencyKey,
+      params.reason,
+    ]
+  );
+  return {
+    id: Number(res.rows[0].id),
+    adjustment_number: res.rows[0].adjustment_number,
+    created_at: res.rows[0].created_at,
+  };
 }

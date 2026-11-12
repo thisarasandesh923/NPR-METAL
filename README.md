@@ -152,3 +152,23 @@ For in-depth architectural and operational guidelines, refer to:
 - [docs/architecture.md](docs/architecture.md): 4-tier layer design, session security, and concurrency controls.
 - [docs/database-design.md](docs/database-design.md): Complete PostgreSQL schema, ER diagrams, triggers, and views.
 - [docs/development-roadmap.md](docs/development-roadmap.md): Nine-phase development roadmap and acceptance criteria.
+- [docs/production-deployment-runbook.md](docs/production-deployment-runbook.md): Safe Supabase Migration `008`, backup reminder, and operator onboarding guide.
+
+---
+
+## 7. Local Demo Mode (Isolated Docker PostgreSQL 17 — Safe & Reversible)
+
+You can test the full billing, spreadsheet operations, approvals, owner payroll, reporting, and export system locally without touching `backend/.env` or Supabase:
+
+1. Start Docker Desktop.
+2. Launch the isolated local demo PostgreSQL 17 container, apply migrations `001`–`008`, provision `npr_app_user`, seed clearly fictional demo workshop data, and open backend/frontend dev servers:
+   ```powershell
+   .\scripts\local-demo\start-local-demo.ps1
+   ```
+3. Sign in at `http://localhost:5173`:
+   - **Local Demo Owner:** `demo_owner` / `LocalDemoPass!2026`
+   - **Local Demo Cashier:** `demo_cashier` / `LocalDemoPass!2026`
+4. Clean up the disposable local container when finished:
+   ```powershell
+   .\scripts\local-demo\stop-local-demo.ps1
+   ```

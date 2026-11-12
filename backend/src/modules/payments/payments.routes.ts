@@ -17,5 +17,12 @@ export function createPaymentsRouter(
     controller.record
   );
 
+  router.post(
+    "/:id/adjust",
+    requireAuth,
+    requireRole("OWNER"),
+    controller.adjust
+  );
+
   return router;
 }

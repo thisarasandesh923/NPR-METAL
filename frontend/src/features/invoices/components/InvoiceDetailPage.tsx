@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchInvoiceDetail } from "../../../api/billing.ts";
 import { ApiError } from "../../../api/client.ts";
+import { reversePaymentEntry } from "../../../api/operations.ts";
 import { Icon } from "../../../components/ui/Icon.tsx";
-import type { InvoiceDetail } from "../../../types/billing.ts";
+import type { UserRole } from "../../../types/auth.ts";
+import type {
+  InvoiceDetail,
+  InvoicePaymentRecord,
+} from "../../../types/billing.ts";
 import {
   formatColomboDateTime,
   formatLkr,
@@ -13,6 +18,7 @@ import { RecordPaymentModal } from "./RecordPaymentModal.tsx";
 interface InvoiceDetailPageProps {
   invoiceId?: number;
   initialInvoice?: InvoiceDetail;
+  userRole?: UserRole;
   onBack: () => void;
   onCreateAnother?: () => void;
 }
@@ -33,6 +39,7 @@ function getStatusClasses(status: InvoiceDetail["paymentStatus"]): string {
 export function InvoiceDetailPage({
   invoiceId,
   initialInvoice,
+  userRole,
   onBack,
   onCreateAnother,
 }: InvoiceDetailPageProps) {
@@ -45,6 +52,12 @@ export function InvoiceDetailPage({
   const [paymentSuccessNotice, setPaymentSuccessNotice] = useState<
     string | null
   >(null);
+  const [reversingPayment, setReversingPayment] =
+    useState<InvoicePaymentRecord | null>(null);
+  const [reversalAmount, setReversalAmount] = useState("");
+  const [reversalReason, setReversalReason] = useState("");
+  const [reversalError, setReversalError] = useState<string | null>(null);
+  const [reversingBusy, setReversingBusy] = useState(false);
 
   const loadFromServer = useCallback(async (id: number) => {
     setLoading(true);
@@ -260,6 +273,7 @@ export function InvoiceDetailPage({
                         <th>Date / Time (Colombo)</th>
                         <th>Notes</th>
                         <th className="text-right">Amount</th>
+                        {userRole === "OWNER" && <th className="text-right">Owner</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -280,10 +294,48 @@ export function InvoiceDetailPage({
                           <td className="text-right font-extrabold text-emerald-700">
                             {formatLkr(pay.amount)}
                           </td>
+                          {userRole === "OWNER" && (
+                            <td className="text-right">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setReversingPayment(pay);
+                                  setReversalAmount(pay.amount);
+                                  setReversalReason("");
+                                  setReversalError(null);
+                                }}
+                                className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900 hover:bg-amber-100"
+                              >
+                                Reverse Entry
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {invoice.adjustments && invoice.adjustments.length > 0 && (
+                <div className="border-t border-slate-200 bg-amber-50/40 px-5 py-4">
+                  <h3 className="mb-2 text-xs font-extrabold uppercase tracking-wider text-amber-900">
+                    Auditable Payment Reversals ({invoice.adjustments.length})
+                  </h3>
+                  <ul className="space-y-1.5 text-xs">
+                    {invoice.adjustments.map((adj) => (
+                      <li key={adj.id} className="flex flex-wrap justify-between gap-2 text-slate-700">
+                        <span>
+                          <strong>{adj.adjustmentNumber}</strong> ({adj.adjustmentType} on{" "}
+                          {adj.receiptNumber}): &ldquo;{adj.reason}&rdquo; &mdash;{" "}
+                          {adj.authorizedByOwnerName}
+                        </span>
+                        <strong className="text-rose-700">
+                          -{formatLkr(adj.adjustmentAmount)}
+                        </strong>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </section>
@@ -346,6 +398,105 @@ export function InvoiceDetailPage({
           }}
         />
       )}
+
+      {reversingPayment && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Reverse payment entry ${reversingPayment.receiptNumber}`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#092547]/55 p-4 backdrop-blur-sm"
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (reversalReason.trim().length < 10) {
+                setReversalError("Adjustment reason must be at least 10 characters.");
+                return;
+              }
+              setReversingBusy(true);
+              setReversalError(null);
+              try {
+                const res = await reversePaymentEntry(reversingPayment.id, {
+                  adjustmentType: "ENTRY_REVERSAL",
+                  amount: reversalAmount.trim(),
+                  reason: reversalReason.trim(),
+                  idempotencyKey: `adj-${crypto.randomUUID()}`,
+                });
+                setInvoice(res.invoice);
+                setReversingPayment(null);
+                setPaymentSuccessNotice(
+                  `Recorded auditable entry reversal on ${reversingPayment.receiptNumber}. Updated balance due: ${formatLkr(res.invoice.balanceDue)}.`
+                );
+              } catch (err) {
+                setReversalError(
+                  err instanceof ApiError
+                    ? err.message
+                    : "Failed to record payment entry reversal."
+                );
+              } finally {
+                setReversingBusy(false);
+              }
+            }}
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+          >
+            <h3 className="text-base font-extrabold text-[#092547]">
+              Owner Entry Reversal &mdash; {reversingPayment.receiptNumber}
+            </h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Creates a permanent append-only <code>ENTRY_REVERSAL</code> audit record without modifying or deleting the original receipt ({formatLkr(reversingPayment.amount)}).
+            </p>
+            {reversalError && (
+              <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs font-semibold text-rose-700">
+                {reversalError}
+              </div>
+            )}
+            <div className="mt-4 space-y-3 text-xs">
+              <label className="block font-bold text-slate-600">
+                Reversal Amount (LKR)
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={reversingPayment.amount}
+                  required
+                  value={reversalAmount}
+                  onChange={(e) => setReversalAmount(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-bold text-[#092547]"
+                />
+              </label>
+              <label className="block font-bold text-slate-600">
+                Audit Reason (Min 10 characters)
+                <textarea
+                  rows={3}
+                  required
+                  minLength={10}
+                  placeholder="e.g., Cashier mistyped Rs. 15,000 instead of Rs. 5,000 cash received."
+                  value={reversalReason}
+                  onChange={(e) => setReversalReason(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-[#092547]"
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setReversingPayment(null)}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={reversingBusy}
+                className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700"
+              >
+                {reversingBusy ? "Recording..." : "Confirm Entry Reversal"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </>
   );
 }
+

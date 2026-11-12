@@ -17,5 +17,33 @@ export function createReportsRouter(
     controller.overview
   );
 
+  router.get(
+    "/financial",
+    requireAuth,
+    requireRole("OWNER"),
+    controller.financial
+  );
+
+  router.get(
+    "/operations",
+    requireAuth,
+    requireRole("OWNER"),
+    controller.operations
+  );
+
+  router.get(
+    "/export",
+    requireAuth,
+    requireRole("OWNER"),
+    controller.exportGeneral
+  );
+
+  router.get(
+    "/export/payroll",
+    requireAuth,
+    requireRole("OWNER"),
+    controller.exportPayroll
+  );
+
   return router;
 }

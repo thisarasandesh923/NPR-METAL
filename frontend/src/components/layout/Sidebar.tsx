@@ -86,34 +86,18 @@ export function Sidebar({
                 <button
                   key={item.label}
                   type="button"
-                  disabled={item.disabled}
                   onClick={() => {
-                    if (item.screen && !item.disabled) {
-                      onNavigate(item.screen);
-                      onClose();
-                    }
+                    onNavigate(item.screen);
+                    onClose();
                   }}
-                  className={`group flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-semibold transition ${
+                  className={`group flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
                     active
                       ? "bg-[#f58220] text-white shadow-[0_8px_24px_rgba(245,130,32,.22)]"
-                      : item.disabled
-                        ? "cursor-not-allowed text-blue-100/35"
-                        : "text-blue-100/75 hover:bg-white/8 hover:text-white"
+                      : "text-blue-100/75 hover:bg-white/8 hover:text-white"
                   }`}
                 >
                   <Icon name={item.icon} className="h-[20px] w-[20px] shrink-0" />
                   <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                  {item.badge && (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.05em] ${
-                        active
-                          ? "bg-white/20 text-white"
-                          : "bg-white/10 text-blue-200/60"
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
                 </button>
               );
             })}
