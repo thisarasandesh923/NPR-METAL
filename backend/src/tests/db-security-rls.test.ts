@@ -143,19 +143,48 @@ describe("Phase 2B3B / 2C — PostgreSQL 17 Supabase Security Hardening, RLS & R
           );
         }
 
-        // Sequence access denied
-        await assert.rejects(
-          async () => {
-            await client.query("SAVEPOINT sp_seq");
-            try {
-              await client.query("SELECT nextval('public.invoice_number_seq')");
-            } catch (err) {
-              await client.query("ROLLBACK TO SAVEPOINT sp_seq");
-              throw err;
-            }
-          },
-          /permission denied/i
-        );
+        // Sequence access denied (including migration sequence pgmigrations_id_seq)
+        for (const seqObj of ["invoice_number_seq", "pgmigrations_id_seq"]) {
+          await assert.rejects(
+            async () => {
+              await client.query(`SAVEPOINT sp_seq_${seqObj}`);
+              try {
+                await client.query(`SELECT nextval('public.${seqObj}')`);
+              } catch (err) {
+                await client.query(`ROLLBACK TO SAVEPOINT sp_seq_${seqObj}`);
+                throw err;
+              }
+            },
+            /permission denied/i,
+            `${roleName} must be denied nextval on ${seqObj}`
+          );
+          await assert.rejects(
+            async () => {
+              await client.query(`SAVEPOINT sp_seq_sel_${seqObj}`);
+              try {
+                await client.query(`SELECT last_value FROM public.${seqObj}`);
+              } catch (err) {
+                await client.query(`ROLLBACK TO SAVEPOINT sp_seq_sel_${seqObj}`);
+                throw err;
+              }
+            },
+            /permission denied/i,
+            `${roleName} must be denied SELECT on ${seqObj}`
+          );
+          await assert.rejects(
+            async () => {
+              await client.query(`SAVEPOINT sp_seq_upd_${seqObj}`);
+              try {
+                await client.query(`SELECT setval('public.${seqObj}', 1)`);
+              } catch (err) {
+                await client.query(`ROLLBACK TO SAVEPOINT sp_seq_upd_${seqObj}`);
+                throw err;
+              }
+            },
+            /permission denied/i,
+            `${roleName} must be denied setval on ${seqObj}`
+          );
+        }
 
         await client.query("ROLLBACK");
       } finally {
@@ -465,13 +494,16 @@ describe("Phase 2B3B / 2C — PostgreSQL 17 Supabase Security Hardening, RLS & R
     );
     assert.equal(custView.rows.length, 1);
 
-    // pgmigrations history completely inaccessible
+    // pgmigrations history and pgmigrations_id_seq completely inaccessible
     for (const badMigSql of [
       "SELECT * FROM public.pgmigrations",
       "INSERT INTO public.pgmigrations (name, run_on) VALUES ('999_fake', NOW())",
       "UPDATE public.pgmigrations SET name = 'tamper'",
       "DELETE FROM public.pgmigrations",
       "TRUNCATE public.pgmigrations",
+      "SELECT nextval('public.pgmigrations_id_seq')",
+      "SELECT last_value FROM public.pgmigrations_id_seq",
+      "SELECT setval('public.pgmigrations_id_seq', 1)",
     ]) {
       await assert.rejects(
         () => appUserPool!.query(badMigSql),
@@ -479,6 +511,43 @@ describe("Phase 2B3B / 2C — PostgreSQL 17 Supabase Security Hardening, RLS & R
         `npr_app_user must be denied: ${badMigSql}`
       );
     }
+
+    for (const roleCheck of ["anon", "authenticated", "npr_app_user"]) {
+      const seqPriv = await adminPool.query<{ u: boolean; s: boolean; upd: boolean }>(
+        `SELECT
+           has_sequence_privilege($1, 'public.pgmigrations_id_seq', 'USAGE') AS u,
+           has_sequence_privilege($1, 'public.pgmigrations_id_seq', 'SELECT') AS s,
+           has_sequence_privilege($1, 'public.pgmigrations_id_seq', 'UPDATE') AS upd`,
+        [roleCheck]
+      );
+      assert.equal(seqPriv.rows[0].u, false, `${roleCheck} must lack USAGE on pgmigrations_id_seq`);
+      assert.equal(seqPriv.rows[0].s, false, `${roleCheck} must lack SELECT on pgmigrations_id_seq`);
+      assert.equal(seqPriv.rows[0].upd, false, `${roleCheck} must lack UPDATE on pgmigrations_id_seq`);
+    }
+
+    // Inspect PUBLIC pseudo-role privileges via relacl / aclexplode(COALESCE(relacl, acldefault))
+    const publicSeqAcl = await adminPool.query<{ privilege_type: string }>(
+      `SELECT a.privilege_type
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('S', c.relowner))) AS a
+       WHERE n.nspname = 'public' AND c.relname = 'pgmigrations_id_seq' AND a.grantee = 0`
+    );
+    assert.equal(
+      publicSeqAcl.rows.length,
+      0,
+      `PUBLIC pseudo-role (grantee=0) must hold zero privileges on pgmigrations_id_seq, got ${JSON.stringify(publicSeqAcl.rows)}`
+    );
+
+    const adminSeqPriv = await adminPool.query<{ u: boolean; s: boolean; upd: boolean }>(
+      `SELECT
+         has_sequence_privilege('postgres', 'public.pgmigrations_id_seq', 'USAGE') AS u,
+         has_sequence_privilege('postgres', 'public.pgmigrations_id_seq', 'SELECT') AS s,
+         has_sequence_privilege('postgres', 'public.pgmigrations_id_seq', 'UPDATE') AS upd`
+    );
+    assert.equal(adminSeqPriv.rows[0].u, true);
+    assert.equal(adminSeqPriv.rows[0].s, true);
+    assert.equal(adminSeqPriv.rows[0].upd, true);
 
     // Forbidden UPDATE/DELETE across protected financial & identity tables
     for (const forbiddenStmt of [
