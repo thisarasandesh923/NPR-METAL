@@ -10,13 +10,21 @@ export function RecentInvoicesTable({ invoices }: RecentInvoicesTableProps) {
     <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_20px_rgba(15,39,71,.045)]">
       <div className="flex flex-col justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center md:px-6">
         <div>
-          <h2 className="text-lg font-extrabold text-[#092547]">Recent Invoices</h2>
-          <p className="mt-1 text-xs text-slate-400">Latest invoices issued today</p>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-lg font-extrabold text-[#092547]">
+              Sample Invoices (Demo)
+            </h2>
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-amber-800">
+              Placeholder
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            Illustrative sample rows only (Phase 4 live invoice feed pending)
+          </p>
         </div>
-        <button className="flex items-center gap-2 self-start text-sm font-bold text-[#e77418] transition hover:text-[#bc5810] sm:self-auto">
-          View All
-          <Icon name="arrow" className="h-4 w-4" />
-        </button>
+        <span className="self-start text-xs font-semibold text-slate-400 sm:self-auto">
+          History available in Phase 4
+        </span>
       </div>
 
       <div className="overflow-x-auto">

@@ -1,37 +1,47 @@
 import type { ReactNode } from "react";
-import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
+import { Sidebar } from "./Sidebar.tsx";
+import { Header } from "./Header.tsx";
+import type { AppScreen, AuthUser } from "../../types/auth.ts";
 
 interface MainLayoutProps {
   children: ReactNode;
+  user: AuthUser;
   menuOpen: boolean;
   onCloseMenu: () => void;
   onOpenMenu: () => void;
-  currentScreen: "dashboard" | "invoice";
-  onNavigateDashboard: () => void;
-  onNavigateNewInvoice: () => void;
+  currentScreen: AppScreen;
+  onNavigate: (screen: AppScreen) => void;
+  onLogout: () => Promise<void>;
+  isLoggingOut: boolean;
+  logoutError: string | null;
 }
 
 export function MainLayout({
   children,
+  user,
   menuOpen,
   onCloseMenu,
   onOpenMenu,
   currentScreen,
-  onNavigateDashboard,
-  onNavigateNewInvoice,
+  onNavigate,
+  onLogout,
+  isLoggingOut,
+  logoutError,
 }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-[#f4f7fb] text-slate-900">
       <Sidebar
         open={menuOpen}
         onClose={onCloseMenu}
-        onCreate={onNavigateNewInvoice}
-        onDashboard={onNavigateDashboard}
+        user={user}
         currentScreen={currentScreen}
+        onNavigate={onNavigate}
+        onLogout={onLogout}
+        isLoggingOut={isLoggingOut}
+        logoutError={logoutError}
       />
       <main className="min-h-screen lg:ml-[274px]">
-        <Header onOpenMenu={onOpenMenu} currentScreen={currentScreen} />
+        <Header user={user} onOpenMenu={onOpenMenu} currentScreen={currentScreen} />
         {children}
       </main>
     </div>

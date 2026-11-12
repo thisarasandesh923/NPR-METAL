@@ -1,14 +1,40 @@
-import { Icon } from "../ui/Icon";
+import { Icon } from "../ui/Icon.tsx";
+import type { AppScreen, AuthUser } from "../../types/auth.ts";
 
 interface HeaderProps {
+  user: AuthUser;
   onOpenMenu: () => void;
-  currentScreen: "dashboard" | "invoice";
+  currentScreen: AppScreen;
 }
 
-export function Header({ onOpenMenu, currentScreen }: HeaderProps) {
+const SCREEN_TITLES: Record<AppScreen, string> = {
+  "owner-dashboard": "Owner Overview",
+  "cashier-dashboard": "Cashier Dashboard",
+  "new-invoice": "New Invoice (Demo)",
+};
+
+function formatColomboDate(): string {
+  try {
+    return new Intl.DateTimeFormat("en-LK", {
+      timeZone: "Asia/Colombo",
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(new Date());
+  } catch {
+    return new Date().toDateString();
+  }
+}
+
+export function Header({ user, onOpenMenu, currentScreen }: HeaderProps) {
+  const isDemoScreen =
+    currentScreen === "cashier-dashboard" || currentScreen === "new-invoice";
+
   return (
     <header className="sticky top-0 z-20 flex h-[76px] items-center border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur md:px-8 lg:px-10">
       <button
+        type="button"
         onClick={onOpenMenu}
         className="mr-3 rounded-xl border border-slate-200 p-2.5 text-[#092547] lg:hidden"
         aria-label="Open menu"
@@ -16,25 +42,27 @@ export function Header({ onOpenMenu, currentScreen }: HeaderProps) {
         <Icon name="menu" className="h-5 w-5" />
       </button>
 
-      <div className="hidden text-sm text-slate-400 sm:block">
-        Dashboard <span className="mx-2 text-slate-300">/</span>{" "}
+      <div className="flex items-center gap-3 text-sm text-slate-400">
+        <span className="hidden sm:inline">Workspace</span>
+        <span className="hidden text-slate-300 sm:inline">/</span>
         <span className="font-semibold text-[#092547]">
-          {currentScreen === "dashboard" ? "Overview" : "New Invoice"}
+          {SCREEN_TITLES[currentScreen]}
         </span>
+        {isDemoScreen && (
+          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-amber-800">
+            Demo Preview
+          </span>
+        )}
       </div>
 
       <div className="ml-auto flex items-center gap-3">
+        <span className="hidden rounded-full bg-[#edf3fa] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.05em] text-[#124f8c] sm:inline-flex">
+          {user.role}
+        </span>
         <div className="hidden text-right md:block">
-          <p className="text-sm font-bold text-[#092547]">Saturday, May 24, 2025</p>
+          <p className="text-sm font-bold text-[#092547]">{formatColomboDate()}</p>
           <p className="mt-0.5 text-xs text-slate-400">Kurunegala, Sri Lanka</p>
         </div>
-        <button
-          className="relative ml-2 rounded-xl border border-slate-200 bg-white p-2.5 text-slate-500 transition hover:bg-slate-50"
-          aria-label="Notifications"
-        >
-          <Icon name="bell" className="h-5 w-5" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full border-2 border-white bg-[#f58220]" />
-        </button>
       </div>
     </header>
   );
