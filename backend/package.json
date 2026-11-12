@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "tsx --test src/tests/**/*.test.ts",
-    "test:unit": "tsx --test src/tests/db-config.test.ts src/tests/auth-unit.test.ts",
+    "test:unit": "tsx --test src/tests/db-config.test.ts src/tests/auth-unit.test.ts src/tests/money-unit.test.ts",
     "test:auth": "tsx --test src/tests/auth.test.ts",
+    "test:billing": "tsx --test src/tests/billing.test.ts",
     "test:db": "tsx --test src/tests/db-integrity.test.ts",
     "test:security": "tsx --test src/tests/db-security-rls.test.ts",
     "dev": "tsx watch src/server.ts",

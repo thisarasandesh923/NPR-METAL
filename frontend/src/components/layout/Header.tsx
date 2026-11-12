@@ -10,7 +10,9 @@ interface HeaderProps {
 const SCREEN_TITLES: Record<AppScreen, string> = {
   "owner-dashboard": "Owner Overview",
   "cashier-dashboard": "Cashier Dashboard",
-  "new-invoice": "New Invoice (Demo)",
+  "new-invoice": "New Invoice",
+  invoices: "Invoice History",
+  "invoice-detail": "Invoice Details",
 };
 
 function formatColomboDate(): string {
@@ -28,11 +30,8 @@ function formatColomboDate(): string {
 }
 
 export function Header({ user, onOpenMenu, currentScreen }: HeaderProps) {
-  const isDemoScreen =
-    currentScreen === "cashier-dashboard" || currentScreen === "new-invoice";
-
   return (
-    <header className="sticky top-0 z-20 flex h-[76px] items-center border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur md:px-8 lg:px-10">
+    <header className="no-print sticky top-0 z-20 flex h-[76px] items-center border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur md:px-8 lg:px-10">
       <button
         type="button"
         onClick={onOpenMenu}
@@ -48,11 +47,6 @@ export function Header({ user, onOpenMenu, currentScreen }: HeaderProps) {
         <span className="font-semibold text-[#092547]">
           {SCREEN_TITLES[currentScreen]}
         </span>
-        {isDemoScreen && (
-          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-amber-800">
-            Demo Preview
-          </span>
-        )}
       </div>
 
       <div className="ml-auto flex items-center gap-3">

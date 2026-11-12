@@ -1,23 +1,34 @@
-import { Icon } from "../../../components/ui/Icon";
-import { formatLkr } from "../../../utils/formatters";
-import { DEMO_MATERIAL_OPTIONS } from "../../../data/demo/materials";
-import type { MaterialName, MaterialRow } from "../../../types/invoice";
+import { Icon } from "../../../components/ui/Icon.tsx";
+import type { MaterialCatalogItem } from "../../../types/billing.ts";
+import { formatLkr } from "../../../utils/formatters.ts";
+
+export interface InvoiceLineDraft {
+  rowKey: number;
+  materialId: number;
+  quantity: string;
+}
 
 interface MaterialItemsSectionProps {
-  items: MaterialRow[];
-  onUpdateMaterial: (id: number, material: MaterialName) => void;
-  onUpdateQuantity: (id: number, quantity: number) => void;
+  materials: MaterialCatalogItem[];
+  items: InvoiceLineDraft[];
+  onUpdateMaterial: (rowKey: number, materialId: number) => void;
+  onUpdateQuantity: (rowKey: number, quantity: string) => void;
   onAddItem: () => void;
-  onRemoveItem: (id: number) => void;
+  onRemoveItem: (rowKey: number) => void;
+  disabled?: boolean;
 }
 
 export function MaterialItemsSection({
+  materials,
   items,
   onUpdateMaterial,
   onUpdateQuantity,
   onAddItem,
   onRemoveItem,
+  disabled = false,
 }: MaterialItemsSectionProps) {
+  const materialsById = new Map(materials.map((m) => [m.id, m]));
+
   return (
     <section className="invoice-panel">
       <div className="invoice-panel-heading flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -25,12 +36,12 @@ export function MaterialItemsSection({
           <span className="invoice-step">02</span>
           <div>
             <h2>Material Details</h2>
-            <p>Enter quantity in cubic meters (m³)</p>
+            <p>Enter quantities in cubic metres (m³) using PostgreSQL catalogue prices</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-700">
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-bold text-[#124f8c]">
           <Icon name="lock" className="h-3.5 w-3.5" />
-          Demo Prices · Owner-managed in production
+          Server-Locked Unit Prices
         </div>
       </div>
 
@@ -42,92 +53,112 @@ export function MaterialItemsSection({
               <th>Material</th>
               <th>Quantity (m³)</th>
               <th>Unit Price (LKR / m³)</th>
-              <th className="text-right">Line Total (LKR)</th>
+              <th className="text-right">Preview Line Total</th>
               <th className="w-20 text-center">Remove</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((item, index) => (
-              <tr key={item.id} className="border-t border-slate-100">
-                <td className="font-bold text-slate-400">
-                  {String(index + 1).padStart(2, "0")}
-                </td>
-                <td>
-                  <select
-                    className="table-control min-w-40"
-                    value={item.material}
-                    onChange={(event) =>
-                      onUpdateMaterial(item.id, event.target.value as MaterialName)
-                    }
-                  >
-                    {DEMO_MATERIAL_OPTIONS.map((material) => (
-                      <option key={material}>{material}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <div className="relative w-36">
-                    <input
-                      className="table-control w-full pr-11"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={item.quantity}
+            {items.map((item, index) => {
+              const mat = materialsById.get(item.materialId);
+              const unitPrice = mat ? Number(mat.currentUnitPrice) : 0;
+              const qtyNum = Number(item.quantity);
+              const previewTotal =
+                Number.isFinite(qtyNum) && qtyNum > 0
+                  ? Math.round(qtyNum * unitPrice * 100) / 100
+                  : 0;
+
+              return (
+                <tr key={item.rowKey} className="border-t border-slate-100">
+                  <td className="font-bold text-slate-400">
+                    {String(index + 1).padStart(2, "0")}
+                  </td>
+                  <td>
+                    <select
+                      aria-label={`Material item ${index + 1}`}
+                      disabled={disabled || materials.length === 0}
+                      className="table-control min-w-44"
+                      value={item.materialId}
                       onChange={(event) =>
-                        onUpdateQuantity(item.id, Number(event.target.value))
+                        onUpdateMaterial(item.rowKey, Number(event.target.value))
                       }
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                      m³
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <div className="relative w-48">
-                    <input
-                      className="table-control locked-price w-full pl-11"
-                      value={item.price.toLocaleString("en-LK", {
-                        minimumFractionDigits: 2,
-                      })}
-                      readOnly
-                      aria-label={`${item.material} demo price (owner-managed in production)`}
-                    />
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                      Rs.
-                    </span>
-                    <Icon
-                      name="lock"
-                      className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
-                    />
-                  </div>
-                </td>
-                <td className="text-right text-sm font-extrabold text-[#092547]">
-                  {formatLkr(item.quantity * item.price)}
-                </td>
-                <td className="text-center">
-                  <button
-                    type="button"
-                    disabled={items.length === 1}
-                    onClick={() => onRemoveItem(item.id)}
-                    className="rounded-lg p-2.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
-                    aria-label={`Remove item ${index + 1}`}
-                  >
-                    <Icon name="trash" className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    >
+                      {materials.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.code})
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <div className="relative w-40">
+                      <input
+                        aria-label={`Quantity in cubic meters for item ${index + 1}`}
+                        disabled={disabled}
+                        className="table-control w-full pr-11"
+                        type="number"
+                        min="0.001"
+                        step="0.001"
+                        value={item.quantity}
+                        onChange={(event) =>
+                          onUpdateQuantity(item.rowKey, event.target.value)
+                        }
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        m³
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="relative w-48">
+                      <input
+                        className="table-control locked-price w-full pl-11"
+                        value={
+                          mat
+                            ? formatLkr(mat.currentUnitPrice).replace("Rs. ", "")
+                            : "0.00"
+                        }
+                        readOnly
+                        aria-label={`${mat?.name ?? "Material"} unit price`}
+                      />
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        Rs.
+                      </span>
+                      <Icon
+                        name="lock"
+                        className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                      />
+                    </div>
+                  </td>
+                  <td className="text-right text-sm font-extrabold text-[#092547]">
+                    {formatLkr(previewTotal)}
+                  </td>
+                  <td className="text-center">
+                    <button
+                      type="button"
+                      disabled={disabled || items.length === 1}
+                      onClick={() => onRemoveItem(item.rowKey)}
+                      className="rounded-lg p-2.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-30"
+                      aria-label={`Remove item ${index + 1}`}
+                    >
+                      <Icon name="trash" className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-      <div className="border-t border-slate-100 p-5 md:px-6">
+
+      <div className="border-t border-slate-100 p-4 md:px-6">
         <button
           type="button"
+          disabled={disabled || materials.length === 0}
           onClick={onAddItem}
-          className="flex min-h-11 items-center gap-2 rounded-xl border border-dashed border-[#f58220] px-4 text-xs font-bold text-[#e77418] transition hover:bg-orange-50"
+          className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-xs font-bold text-[#124f8c] transition hover:border-[#f58220] hover:bg-orange-50/40 hover:text-[#e77418] disabled:opacity-40"
         >
           <Icon name="plus" className="h-4 w-4" />
-          Add Material Row
+          Add Material Item
         </button>
       </div>
     </section>

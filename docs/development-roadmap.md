@@ -129,12 +129,23 @@ Foundation    English    Database     Auth &      Catalog &   Invoicing &  Payme
 ---
 
 ### Phase 8: Hardening, Automated Testing & Senior Review Handover
-- **Objective:** Final end-to-end verification, security hardening, and code audit readiness.
+- **Objective:** Final end-to-end verification, security hardening, and code audit readiness for core billing.
 - **Deliverables:**
   - Full automated regression test suite across backend and frontend.
   - Security audit: Parameterization check, header verification (`Helmet`), rate limits, cookie flags.
   - Comprehensive Senior Developer review documentation and walkthrough guide.
 - **Quality Gates:** All quality gates pass across the entire codebase.
+
+---
+
+### Phase 9 (Planned Future Scope): Workshop Operations, Production & Payroll Management
+- **Status:** Requirements captured in [requirements.md](./requirements.md#L96-L111); **not yet implemented**. Pending client sign-off on payroll, machine-hour, and production measurement rules before schema migration.
+- **Planned Scope:**
+  - Worker attendance tracking and strictly **OWNER-only** confidential wage rates & payroll approval.
+  - Machine working hours & downtime logs.
+  - Daily crushed metal production quantities.
+  - Spreadsheet-style daily operations entry submitted by Cashiers and reviewed/approved by the Owner.
+  - Combined Owner operational and financial reports.
 
 ---
 

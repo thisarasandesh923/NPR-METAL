@@ -11,7 +11,12 @@ export interface AuthUser {
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
-export type AppScreen = "owner-dashboard" | "cashier-dashboard" | "new-invoice";
+export type AppScreen =
+  | "owner-dashboard"
+  | "cashier-dashboard"
+  | "new-invoice"
+  | "invoices"
+  | "invoice-detail";
 
 export function isValidUserRole(value: unknown): value is UserRole {
   return value === "OWNER" || value === "CASHIER";

@@ -43,13 +43,13 @@ export function Sidebar({
   return (
     <>
       <div
-        className={`fixed inset-0 z-30 bg-[#071b35]/50 backdrop-blur-sm transition-opacity lg:hidden ${
+        className={`no-print fixed inset-0 z-30 bg-[#071b35]/50 backdrop-blur-sm transition-opacity lg:hidden ${
           open ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onClose}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[274px] flex-col bg-[#092547] text-white shadow-2xl transition-transform duration-300 lg:translate-x-0 ${
+        className={`no-print fixed inset-y-0 left-0 z-40 flex w-[274px] flex-col bg-[#092547] text-white shadow-2xl transition-transform duration-300 lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -108,9 +108,7 @@ export function Sidebar({
                       className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.05em] ${
                         active
                           ? "bg-white/20 text-white"
-                          : item.badge === "Demo"
-                            ? "bg-amber-400/20 text-amber-200"
-                            : "bg-white/10 text-blue-200/60"
+                          : "bg-white/10 text-blue-200/60"
                       }`}
                     >
                       {item.badge}

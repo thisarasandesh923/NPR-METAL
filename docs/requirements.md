@@ -93,6 +93,21 @@ The NPR Metal Crusher Billing & Management System is an enterprise-grade operati
 - **Customer Debtor Ledger:** Comprehensive list of customers with aging outstanding balances and payment history.
 - **Audit Trail:** Complete log of material price alterations, payment adjustments, and system events.
 
+### 3.5 Future Operational Modules (Confirmed Client Scope — Not Yet Implemented)
+The following operational modules are confirmed for future implementation phases and are **not** included in the current Billing & Payments MVP:
+
+- **Worker Attendance & Salary Management:** Track daily employee attendance, work shifts, and wage/salary calculations. Workers' confidential wage rates and payroll approvals remain strictly **OWNER-only** by default.
+- **Machine Working Hours & Downtime Tracking:** Log daily operating hours, maintenance pauses, and unplanned downtime across crusher and workshop machinery.
+- **Daily Metal Crushing / Production Quantities:** Record daily crushed aggregate production outputs across workshop material categories.
+- **Spreadsheet-Style Daily Operations Entry & Approval Workflow:** Provide a structured grid/spreadsheet-style daily operations input screen where Cashiers submit daily operational records and the Owner reviews, verifies, and approves entries.
+- **Owner Operational & Financial Reports:** Unified executive views combining production output, machine utilization, labor cost summaries, and billing revenue.
+
+#### Open Client Decisions Pending Before Future Operations Schema Design
+1. **Payroll Rules:** Daily wage vs. hourly/piece-rate calculation rules, overtime thresholds/multipliers, salary advances/deductions, and weekly vs. monthly payroll cycles.
+2. **Machine-Hour Measurement:** Direct hour-meter start/end readings vs. elapsed shift hours, exact list of tracked machines, and standardized downtime reason categories.
+3. **Production Quantity Measurement:** Unit standardization (`m³` vs. metric tons/cube equivalents), stockpile vs. direct-load tracking, and waste/reject handling.
+4. **Post-Approval Immutability:** Amendment rules and audit requirements when correcting an operational entry after Owner approval.
+
 ---
 
 ## 4. Non-Functional Requirements

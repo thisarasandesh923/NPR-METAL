@@ -1,16 +1,16 @@
-import { Icon } from "../../../components/ui/Icon";
-import { formatLkr } from "../../../utils/formatters";
-import type { PaymentStatus } from "../../../types/invoice";
+import { formatLkr } from "../../../utils/formatters.ts";
+import type { PaymentStatus } from "../../../types/invoice.ts";
 
 interface PaymentDetailsSectionProps {
-  cashReceived: number;
-  onChangeCashReceived: (amount: number) => void;
+  cashReceived: string;
+  onChangeCashReceived: (amount: string) => void;
   paymentStatus: PaymentStatus;
   balance: number;
   paidAmount: number;
   grandTotal: number;
   isOverpayment: boolean;
   overpaymentAmount: number;
+  disabled?: boolean;
 }
 
 export function PaymentDetailsSection({
@@ -22,38 +22,64 @@ export function PaymentDetailsSection({
   grandTotal,
   isOverpayment,
   overpaymentAmount,
+  disabled = false,
 }: PaymentDetailsSectionProps) {
   return (
     <section className="invoice-panel">
-      <div className="invoice-panel-heading">
-        <span className="invoice-step">04</span>
-        <div>
-          <h2>Cash Payment</h2>
-          <p>Payment status is calculated based on cash received</p>
+      <div className="invoice-panel-heading flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="invoice-step">04</span>
+          <div>
+            <h2>Initial Cash Payment</h2>
+            <p>Enter cash received now (0 for credit invoice, or partial/full payment)</p>
+          </div>
         </div>
+        {!disabled && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onChangeCashReceived("0.00")}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Credit (0)
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeCashReceived(grandTotal.toFixed(2))}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-[#124f8c] hover:bg-slate-50"
+            >
+              Pay Full
+            </button>
+          </div>
+        )}
       </div>
+
       <div className="grid gap-5 p-5 md:grid-cols-2 md:p-6">
         <label>
-          <span className="form-label">Cash Received (LKR)</span>
+          <span className="form-label">Initial Cash Received (LKR)</span>
           <div className="relative">
             <input
+              name="initialPaymentAmount"
+              disabled={disabled}
               className={`form-control pl-12 text-base font-extrabold ${
                 isOverpayment
                   ? "border-rose-400 bg-rose-50/40 text-rose-900 focus:border-rose-500 focus:ring-rose-200"
                   : ""
               }`}
-              type="number"
-              min="0"
+              type="text"
+              inputMode="decimal"
               value={cashReceived}
-              onChange={(event) => onChangeCashReceived(Number(event.target.value))}
+              onChange={(event) => onChangeCashReceived(event.target.value)}
+              placeholder="0.00"
             />
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
               Rs.
             </span>
           </div>
         </label>
+
         <div>
-          <span className="form-label">Payment Status</span>
+          <span className="form-label">Preview Status</span>
           <div
             className={`payment-state ${
               isOverpayment
@@ -73,22 +99,15 @@ export function PaymentDetailsSection({
 
       {isOverpayment && (
         <div className="mx-5 mb-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 md:mx-6 md:mb-6">
-          <div className="flex items-start gap-2.5">
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-200 text-rose-800 font-bold">
-              !
-            </div>
-            <div>
-              <p className="font-extrabold text-rose-900">
-                Excess Cash Warning: Overpayment Detected
-              </p>
-              <p className="mt-1 leading-relaxed text-rose-700">
-                Entered cash of <strong>{formatLkr(cashReceived)}</strong> exceeds the invoice total (
-                <strong>{formatLkr(grandTotal)}</strong>) by <strong>{formatLkr(overpaymentAmount)}</strong>.
-                Cash payments cannot exceed the invoice total and cannot be recorded as a valid payment.
-                Please enter the exact cash received or an amount up to the grand total.
-              </p>
-            </div>
-          </div>
+          <p className="font-extrabold text-rose-900">
+            Overpayment Not Permitted
+          </p>
+          <p className="mt-1 leading-relaxed text-rose-700">
+            Entered cash exceeds the invoice grand total (
+            <strong>{formatLkr(grandTotal)}</strong>) by{" "}
+            <strong>{formatLkr(overpaymentAmount)}</strong>. Reduce the payment to
+            Rs. {grandTotal.toFixed(2)} or less before issuing.
+          </p>
         </div>
       )}
     </section>

@@ -14,6 +14,16 @@ import {
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
 import { AuthService } from "./modules/auth/auth.service.js";
 import type { UserRole } from "./modules/auth/auth.types.js";
+import { createCustomersRouter } from "./modules/customers/customers.routes.js";
+import { CustomersService } from "./modules/customers/customers.service.js";
+import { createInvoicesRouter } from "./modules/invoices/invoices.routes.js";
+import { InvoicesService } from "./modules/invoices/invoices.service.js";
+import { createMaterialsRouter } from "./modules/materials/materials.routes.js";
+import { MaterialsService } from "./modules/materials/materials.service.js";
+import { createPaymentsRouter } from "./modules/payments/payments.routes.js";
+import { PaymentsService } from "./modules/payments/payments.service.js";
+import { createReportsRouter } from "./modules/reports/reports.routes.js";
+import { ReportsService } from "./modules/reports/reports.service.js";
 
 export interface AppDependencies {
   pool: Pool;
@@ -58,6 +68,27 @@ export function createApp(deps: AppDependencies): Express {
     securityConfig
   );
   app.use("/api/auth", authRouter);
+
+  app.use(
+    "/api/materials",
+    createMaterialsRouter(new MaterialsService(deps.pool), requireAuth)
+  );
+  app.use(
+    "/api/customers",
+    createCustomersRouter(new CustomersService(deps.pool), requireAuth)
+  );
+  app.use(
+    "/api/invoices",
+    createInvoicesRouter(new InvoicesService(deps.pool), requireAuth)
+  );
+  app.use(
+    "/api/payments",
+    createPaymentsRouter(new PaymentsService(deps.pool), requireAuth)
+  );
+  app.use(
+    "/api/reports",
+    createReportsRouter(new ReportsService(deps.pool), requireAuth)
+  );
 
   if (deps.registerExtraRoutes) {
     if (

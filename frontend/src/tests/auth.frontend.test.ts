@@ -278,6 +278,26 @@ describe("Phase 3B — Frontend Authentication API, RBAC Guards & React UI Tests
       if (url === "/api/auth/me") {
         return jsonResponse(200, { success: true, data: { user: owner } });
       }
+      if (url === "/api/reports/overview") {
+        return jsonResponse(200, {
+          success: true,
+          data: {
+            overview: {
+              businessDate: "2026-11-12",
+              todayInvoiceCount: 0,
+              todayBilledTotal: "0.00",
+              todayCashCollected: "0.00",
+              todayReceiptCount: 0,
+              totalOutstandingBalance: "0.00",
+              openInvoicesCount: 0,
+              totalIssuedInvoicesCount: 0,
+            },
+          },
+        });
+      }
+      if (url.startsWith("/api/invoices")) {
+        return jsonResponse(200, { success: true, data: { invoices: [] } });
+      }
       return jsonResponse(404, { success: false, error: { message: "Not found" } });
     });
 
@@ -347,6 +367,28 @@ describe("Phase 3B — Frontend Authentication API, RBAC Guards & React UI Tests
         return jsonResponse(200, { success: true, data: { loggedOut: true } });
       }
 
+      if (url === "/api/reports/overview") {
+        return jsonResponse(200, {
+          success: true,
+          data: {
+            overview: {
+              businessDate: "2026-11-12",
+              todayInvoiceCount: 0,
+              todayBilledTotal: "0.00",
+              todayCashCollected: "0.00",
+              todayReceiptCount: 0,
+              totalOutstandingBalance: "0.00",
+              openInvoicesCount: 0,
+              totalIssuedInvoicesCount: 0,
+            },
+          },
+        });
+      }
+
+      if (url.startsWith("/api/invoices")) {
+        return jsonResponse(200, { success: true, data: { invoices: [] } });
+      }
+
       return jsonResponse(404, { success: false, error: { message: "Unknown" } });
     });
 
@@ -396,7 +438,8 @@ describe("Phase 3B — Frontend Authentication API, RBAC Guards & React UI Tests
     });
     assert.match(container.textContent ?? "", /Cashier Dashboard/);
     assert.match(container.textContent ?? "", /Welcome, Nadeesha!/);
-    assert.match(container.textContent ?? "", /Demo Preview Only/);
+    assert.match(container.textContent ?? "", /No invoices issued yet/);
+    assert.doesNotMatch(container.textContent ?? "", /Rs\. 284,500/);
     assert.doesNotMatch(container.textContent ?? "", /Owner Management Portal/);
     assert.equal(testDom.window.localStorage.length, 0);
     assert.equal(testDom.window.sessionStorage.length, 0);

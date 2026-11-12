@@ -1,11 +1,11 @@
-import { Icon } from "../../../components/ui/Icon";
-import { useInvoiceForm } from "../hooks/useInvoiceForm";
-import { DemoConfirmationNotice } from "./DemoConfirmationNotice";
-import { CustomerDetailsSection } from "./CustomerDetailsSection";
-import { MaterialItemsSection } from "./MaterialItemsSection";
-import { TransportDetailsSection } from "./TransportDetailsSection";
-import { PaymentDetailsSection } from "./PaymentDetailsSection";
-import { InvoiceSummaryCard } from "./InvoiceSummaryCard";
+import { Icon } from "../../../components/ui/Icon.tsx";
+import { useInvoiceForm } from "../hooks/useInvoiceForm.ts";
+import { CustomerDetailsSection } from "./CustomerDetailsSection.tsx";
+import { InvoiceDetailPage } from "./InvoiceDetailPage.tsx";
+import { InvoiceSummaryCard } from "./InvoiceSummaryCard.tsx";
+import { MaterialItemsSection } from "./MaterialItemsSection.tsx";
+import { PaymentDetailsSection } from "./PaymentDetailsSection.tsx";
+import { TransportDetailsSection } from "./TransportDetailsSection.tsx";
 
 interface NewInvoicePageProps {
   onCancel: () => void;
@@ -13,43 +13,67 @@ interface NewInvoicePageProps {
 
 export function NewInvoicePage({ onCancel }: NewInvoicePageProps) {
   const {
-    saved,
-    setSaved,
+    materials,
+    materialsLoading,
+    materialsError,
+    reloadMaterials,
+    selectedCustomer,
+    customerDraft,
+    handleSelectCustomer,
+    handleChangeCustomerDraft,
     items,
-    withTransport,
-    setWithTransport,
-    transportFee,
-    setTransportFee,
-    cashReceived,
-    setCashReceived,
-    totals,
     updateMaterial,
     updateQuantity,
     addItem,
     removeItem,
+    withTransport,
+    transportFee,
+    handleToggleTransport,
+    handleChangeTransportFee,
+    cashReceived,
+    handleChangeCashReceived,
+    totals,
+    isSubmitting,
+    submitError,
+    persistedInvoice,
+    saveInvoice,
+    resetForNewInvoice,
+    canSubmit,
   } = useInvoiceForm();
+
+  if (persistedInvoice) {
+    return (
+      <div>
+        <div className="no-print mx-auto max-w-[1250px] px-4 pt-6 md:px-8 lg:px-10">
+          <div
+            role="status"
+            className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+              <Icon name="check" className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-emerald-900">
+                Invoice {persistedInvoice.invoiceNumber} Saved Permanently to PostgreSQL
+              </p>
+              <p className="text-xs text-emerald-700">
+                You may now print the official A5 invoice or return to the dashboard.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <InvoiceDetailPage
+          initialInvoice={persistedInvoice}
+          onBack={onCancel}
+          onCreateAnother={resetForNewInvoice}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1500px] p-4 md:p-8 lg:p-10">
-      <div
-        role="note"
-        className="mb-6 flex flex-col justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 sm:flex-row sm:items-center"
-      >
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-amber-900">
-            UI Simulation / Demo Mode Only
-          </p>
-          <p className="mt-0.5 text-xs text-amber-800">
-            Calculations use interactive demo pricing and do not save invoices or payments to PostgreSQL yet.
-          </p>
-        </div>
-        <span className="inline-flex shrink-0 self-start rounded-full bg-amber-200/80 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.06em] text-amber-950 sm:self-center">
-          Demo Only
-        </span>
-      </div>
-
-      {saved && <DemoConfirmationNotice />}
-
       <section className="mb-7 flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
         <div>
           <p className="mb-2 text-sm font-bold text-[#f58220]">Sales Invoice</p>
@@ -57,29 +81,68 @@ export function NewInvoicePage({ onCancel }: NewInvoicePageProps) {
             Create New Invoice
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Enter customer, material, and payment details accurately.
+            Select customer, materials, transport, and cash received. Invoices are numbered &amp; printed only after PostgreSQL save.
           </p>
         </div>
-        <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#124f8c] text-white">
-            <Icon name="invoice" className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400">Invoice Number</p>
-            <p className="text-base font-extrabold tracking-wide text-[#092547]">INV-1049</p>
-          </div>
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm">
+          <Icon name="lock" className="h-4 w-4 text-[#124f8c]" />
+          <span>A5 printing unlocks after server issuance</span>
         </div>
       </section>
 
-      <fieldset disabled={saved} className="space-y-6 disabled:opacity-80">
-        <CustomerDetailsSection />
+      {materialsError && (
+        <div
+          role="alert"
+          className="mb-6 flex flex-col justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800 sm:flex-row sm:items-center"
+        >
+          <span>{materialsError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              void reloadMaterials();
+            }}
+            className="self-start rounded-lg bg-rose-700 px-3 py-1.5 font-bold text-white"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!materialsLoading && !materialsError && materials.length === 0 && (
+        <div
+          role="status"
+          className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold text-amber-900"
+        >
+          No active materials are currently configured in the database catalogue. Invoices cannot be issued until materials (3/4&quot;, Dust, 6×9, ABC) and active selling prices are configured.
+        </div>
+      )}
+
+      {submitError && (
+        <div
+          role="alert"
+          className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700"
+        >
+          {submitError}
+        </div>
+      )}
+
+      <div className="space-y-6">
+        <CustomerDetailsSection
+          selectedCustomer={selectedCustomer}
+          customerDraft={customerDraft}
+          onSelectCustomer={handleSelectCustomer}
+          onChangeDraft={handleChangeCustomerDraft}
+          disabled={isSubmitting}
+        />
 
         <MaterialItemsSection
+          materials={materials}
           items={items}
           onUpdateMaterial={updateMaterial}
           onUpdateQuantity={updateQuantity}
           onAddItem={addItem}
           onRemoveItem={removeItem}
+          disabled={isSubmitting || materialsLoading}
         />
 
         <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
@@ -87,72 +150,40 @@ export function NewInvoicePage({ onCancel }: NewInvoicePageProps) {
             <TransportDetailsSection
               withTransport={withTransport}
               transportFee={transportFee}
-              onToggleTransport={setWithTransport}
-              onChangeTransportFee={setTransportFee}
+              onToggleTransport={handleToggleTransport}
+              onChangeTransportFee={handleChangeTransportFee}
+              disabled={isSubmitting}
             />
 
             <PaymentDetailsSection
               cashReceived={cashReceived}
-              onChangeCashReceived={setCashReceived}
+              onChangeCashReceived={handleChangeCashReceived}
               paymentStatus={totals.paymentStatus}
               balance={totals.balance}
               paidAmount={totals.paidAmount}
               grandTotal={totals.grandTotal}
               isOverpayment={totals.isOverpayment}
               overpaymentAmount={totals.overpaymentAmount}
+              disabled={isSubmitting}
             />
           </div>
 
           <InvoiceSummaryCard
             subtotal={totals.subtotal}
             withTransport={withTransport}
-            transportFee={transportFee}
+            transportFee={withTransport ? Number(transportFee) || 0 : 0}
             grandTotal={totals.grandTotal}
             paidAmount={totals.paidAmount}
             balance={totals.balance}
+            isSubmitting={isSubmitting}
+            canSubmit={canSubmit}
+            onSaveInvoice={() => {
+              void saveInvoice();
+            }}
+            onCancel={onCancel}
           />
         </div>
-      </fieldset>
-
-      <div className="mt-6 flex flex-col-reverse items-stretch justify-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:p-5">
-        {totals.isOverpayment && (
-          <p className="mr-auto text-xs font-bold text-rose-600">
-            Cannot issue invoice: entered cash exceeds the grand total.
-          </p>
-        )}
-        <button
-          type="button"
-          onClick={onCancel}
-          className="min-h-12 rounded-xl border border-slate-200 px-6 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-        >
-          {saved ? "Back to Dashboard" : "Cancel"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setSaved(true)}
-          disabled={saved || totals.isOverpayment}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#f58220] px-7 text-sm font-bold text-white shadow-[0_8px_22px_rgba(245,130,32,.22)] transition hover:bg-[#e77418] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
-          title={
-            totals.isOverpayment
-              ? "Cannot issue invoice: Cash received exceeds the grand total."
-              : undefined
-          }
-        >
-          <Icon
-            name={saved ? "check" : totals.isOverpayment ? "lock" : "print"}
-            className="h-5 w-5"
-          />
-          {saved
-            ? "Simulation Confirmed (Demo)"
-            : totals.isOverpayment
-              ? "Cannot Issue: Payment Exceeds Total"
-              : "Save & Print A5 Invoice (Demo Preview)"}
-        </button>
       </div>
-
-      <p className="mt-5 text-center text-[10px] text-slate-400">
-        Illustrative design prototype · Material prices and invoice actions are for demonstration and not yet persisted to the database.
-      </p>
     </div>
   );
 }

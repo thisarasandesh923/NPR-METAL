@@ -371,3 +371,37 @@
     padding-left: 14px;
   }
 }
+
+.print-only-sheet {
+  display: none;
+}
+
+@page {
+  size: A5 portrait;
+  margin: 8mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #092547 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only-sheet {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  main {
+    margin-left: 0 !important;
+  }
+}

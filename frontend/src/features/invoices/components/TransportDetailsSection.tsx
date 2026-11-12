@@ -1,8 +1,9 @@
 interface TransportDetailsSectionProps {
   withTransport: boolean;
-  transportFee: number;
+  transportFee: string;
   onToggleTransport: (enabled: boolean) => void;
-  onChangeTransportFee: (fee: number) => void;
+  onChangeTransportFee: (fee: string) => void;
+  disabled?: boolean;
 }
 
 export function TransportDetailsSection({
@@ -10,6 +11,7 @@ export function TransportDetailsSection({
   transportFee,
   onToggleTransport,
   onChangeTransportFee,
+  disabled = false,
 }: TransportDetailsSectionProps) {
   return (
     <section className="invoice-panel">
@@ -17,13 +19,14 @@ export function TransportDetailsSection({
         <span className="invoice-step">03</span>
         <div>
           <h2>Transport Details</h2>
-          <p>Select transport option for delivery</p>
+          <p>Select delivery transport or customer self-pickup</p>
         </div>
       </div>
       <div className="p-5 md:p-6">
         <div className="grid gap-3 sm:grid-cols-2">
           <button
             type="button"
+            disabled={disabled}
             onClick={() => onToggleTransport(true)}
             className={`transport-option ${withTransport ? "transport-option-active" : ""}`}
           >
@@ -35,13 +38,14 @@ export function TransportDetailsSection({
           </button>
           <button
             type="button"
+            disabled={disabled}
             onClick={() => onToggleTransport(false)}
             className={`transport-option ${!withTransport ? "transport-option-active" : ""}`}
           >
             <span className="option-radio">{!withTransport && <span />}</span>
             <span>
               <strong>Without Transport</strong>
-              <small>Customer self-pickup</small>
+              <small>Customer self-pickup (Rs. 0.00)</small>
             </span>
           </button>
         </div>
@@ -50,11 +54,14 @@ export function TransportDetailsSection({
             <span className="form-label">Transport Fee (LKR)</span>
             <div className="relative">
               <input
+                name="transportFee"
+                disabled={disabled}
                 className="form-control pl-12"
-                type="number"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={transportFee}
-                onChange={(event) => onChangeTransportFee(Number(event.target.value))}
+                onChange={(event) => onChangeTransportFee(event.target.value)}
+                placeholder="0.00"
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                 Rs.

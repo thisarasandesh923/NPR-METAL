@@ -7,6 +7,8 @@ import {
 } from "./features/auth/authNavigation.ts";
 import { ProtectedRoute } from "./features/auth/components/ProtectedRoute.tsx";
 import { CashierDashboard } from "./features/dashboard/components/CashierDashboard.tsx";
+import { InvoiceDetailPage } from "./features/invoices/components/InvoiceDetailPage.tsx";
+import { InvoiceHistoryPage } from "./features/invoices/components/InvoiceHistoryPage.tsx";
 import { NewInvoicePage } from "./features/invoices/components/NewInvoicePage.tsx";
 import { OwnerDashboard } from "./features/owner/components/OwnerDashboard.tsx";
 import type { AppScreen } from "./types/auth.ts";
@@ -17,6 +19,7 @@ export function AuthenticatedAppShell() {
   const [screenState, setScreenState] = useState<{
     userId: string | null;
     screen: AppScreen;
+    selectedInvoiceId?: number;
   }>({ userId: null, screen: "cashier-dashboard" });
 
   useEffect(() => {
@@ -39,11 +42,16 @@ export function AuthenticatedAppShell() {
             ? resolveAuthorizedScreen(user.role, screenState.screen)
             : getDefaultScreenForRole(user.role);
 
-        const navigateTo = (nextScreen: AppScreen) => {
+        const navigateTo = (nextScreen: AppScreen, invoiceId?: number) => {
           setScreenState({
             userId: user.id,
             screen: resolveAuthorizedScreen(user.role, nextScreen),
+            selectedInvoiceId: invoiceId,
           });
+        };
+
+        const openInvoice = (invoiceId: number) => {
+          navigateTo("invoice-detail", invoiceId);
         };
 
         return (
@@ -53,7 +61,7 @@ export function AuthenticatedAppShell() {
             onOpenMenu={() => setMenuOpen(true)}
             onCloseMenu={() => setMenuOpen(false)}
             currentScreen={activeScreen}
-            onNavigate={navigateTo}
+            onNavigate={(s) => navigateTo(s)}
             onLogout={logout}
             isLoggingOut={isLoggingOut}
             logoutError={logoutError}
@@ -67,23 +75,32 @@ export function AuthenticatedAppShell() {
               >
                 <OwnerDashboard
                   user={user}
-                  onOpenCashierDemo={() => navigateTo("cashier-dashboard")}
+                  onOpenHistory={() => navigateTo("invoices")}
+                  onSelectInvoice={openInvoice}
                 />
               </ProtectedRoute>
             ) : activeScreen === "new-invoice" ? (
               <NewInvoicePage
-                onCancel={() =>
-                  navigateTo(
-                    user.role === "OWNER"
-                      ? "cashier-dashboard"
-                      : getDefaultScreenForRole(user.role)
-                  )
-                }
+                onCancel={() => navigateTo(getDefaultScreenForRole(user.role))}
+              />
+            ) : activeScreen === "invoices" ? (
+              <InvoiceHistoryPage
+                onSelectInvoice={openInvoice}
+                onCreateInvoice={() => navigateTo("new-invoice")}
+              />
+            ) : activeScreen === "invoice-detail" &&
+              screenState.selectedInvoiceId !== undefined ? (
+              <InvoiceDetailPage
+                invoiceId={screenState.selectedInvoiceId}
+                onBack={() => navigateTo("invoices")}
+                onCreateAnother={() => navigateTo("new-invoice")}
               />
             ) : (
               <CashierDashboard
                 user={user}
                 onCreateInvoice={() => navigateTo("new-invoice")}
+                onOpenHistory={() => navigateTo("invoices")}
+                onSelectInvoice={openInvoice}
               />
             )}
           </MainLayout>

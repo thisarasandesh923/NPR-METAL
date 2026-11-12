@@ -5,7 +5,7 @@ export interface RoleNavItem {
   label: string;
   icon: IconName;
   screen?: AppScreen;
-  badge?: "Demo" | "Phase 4";
+  badge?: "Planned";
   disabled?: boolean;
 }
 
@@ -39,27 +39,25 @@ export function getNavItemsForRole(role: UserRole): RoleNavItem[] {
         screen: "owner-dashboard",
       },
       {
-        label: "Cashier Preview",
-        icon: "cash",
-        screen: "cashier-dashboard",
-        badge: "Demo",
+        label: "Invoice History",
+        icon: "history",
+        screen: "invoices",
       },
       {
-        label: "Invoice Simulation",
+        label: "New Invoice",
         icon: "invoice",
         screen: "new-invoice",
-        badge: "Demo",
-      },
-      {
-        label: "Sales Reports",
-        icon: "sales",
-        badge: "Phase 4",
-        disabled: true,
       },
       {
         label: "Price Management",
         icon: "balance",
-        badge: "Phase 4",
+        badge: "Planned",
+        disabled: true,
+      },
+      {
+        label: "Operations & Payroll",
+        icon: "customers",
+        badge: "Planned",
         disabled: true,
       },
     ];
@@ -75,24 +73,16 @@ export function getNavItemsForRole(role: UserRole): RoleNavItem[] {
       label: "New Invoice",
       icon: "invoice",
       screen: "new-invoice",
-      badge: "Demo",
     },
     {
       label: "Invoice History",
       icon: "history",
-      badge: "Phase 4",
-      disabled: true,
+      screen: "invoices",
     },
     {
-      label: "Customers",
-      icon: "customers",
-      badge: "Phase 4",
-      disabled: true,
-    },
-    {
-      label: "Payments",
-      icon: "payments",
-      badge: "Phase 4",
+      label: "Daily Operations",
+      icon: "documents",
+      badge: "Planned",
       disabled: true,
     },
   ];
