@@ -30,3 +30,4 @@ describe("Billing MVP — Fixed-Point BigInt Money Utilities", () => {
     assert.throws(() => parseScaledDecimal("1.2345", 3, "quantity"));
   });
 });
+

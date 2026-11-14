@@ -73,6 +73,7 @@ describe("Phase 5-6 Operations, Approvals, Price Management, Payroll & Payment R
   });
 
   it("blocks Cashier from Owner navigation links and allows Cashier spreadsheet Draft -> Submit", async () => {
+    localStorage.setItem("npr_preferred_language", "en");
     const attendanceRows: Array<Record<string, unknown>> = [];
 
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {

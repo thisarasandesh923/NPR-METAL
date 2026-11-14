@@ -69,3 +69,4 @@ export async function insertCustomer(
   );
   return res.rows[0];
 }
+

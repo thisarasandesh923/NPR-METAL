@@ -1,4 +1,5 @@
 import { Icon } from "../../../components/ui/Icon.tsx";
+import { useLanguage } from "../../../i18n/LanguageContext.tsx";
 import { useInvoiceForm } from "../hooks/useInvoiceForm.ts";
 import { CustomerDetailsSection } from "./CustomerDetailsSection.tsx";
 import { InvoiceDetailPage } from "./InvoiceDetailPage.tsx";
@@ -12,6 +13,7 @@ interface NewInvoicePageProps {
 }
 
 export function NewInvoicePage({ onCancel }: NewInvoicePageProps) {
+  const { t } = useLanguage();
   const {
     materials,
     materialsLoading,
@@ -54,10 +56,10 @@ export function NewInvoicePage({ onCancel }: NewInvoicePageProps) {
             </div>
             <div>
               <p className="text-sm font-extrabold text-emerald-900">
-                Invoice {persistedInvoice.invoiceNumber} Saved Permanently to PostgreSQL
+                {t("invoiceSavedSuccess")} ({persistedInvoice.invoiceNumber})
               </p>
               <p className="text-xs text-emerald-700">
-                You may now print the official A5 invoice or return to the dashboard.
+                {t("invoiceSavedSuccessSubtitle")}
               </p>
             </div>
           </div>
@@ -76,17 +78,19 @@ export function NewInvoicePage({ onCancel }: NewInvoicePageProps) {
     <div className="mx-auto max-w-[1500px] p-4 md:p-8 lg:p-10">
       <section className="mb-7 flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
         <div>
-          <p className="mb-2 text-sm font-bold text-[#f58220]">Sales Invoice</p>
+          <p className="mb-2 text-sm font-bold text-[#f58220]">
+            {t("salesInvoice")}
+          </p>
           <h1 className="text-2xl font-extrabold tracking-tight text-[#092547] md:text-[32px]">
-            Create New Invoice
+            {t("newSalesInvoiceTitle")}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Select customer, materials, transport, and cash received. Invoices are numbered &amp; printed only after PostgreSQL save.
+            {t("newSalesInvoiceSubtitle")}
           </p>
         </div>
         <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm">
           <Icon name="lock" className="h-4 w-4 text-[#124f8c]" />
-          <span>A5 printing unlocks after server issuance</span>
+          <span>{t("summarySubtitle")}</span>
         </div>
       </section>
 

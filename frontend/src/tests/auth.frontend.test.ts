@@ -436,9 +436,9 @@ describe("Phase 3B — Frontend Authentication API, RBAC Guards & React UI Tests
       form2.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
       await flushMicrotasks();
     });
-    assert.match(container.textContent ?? "", /Cashier Dashboard/);
-    assert.match(container.textContent ?? "", /Welcome, Nadeesha!/);
-    assert.match(container.textContent ?? "", /No invoices issued yet/);
+    assert.match(container.textContent ?? "", /(?:Cashier Dashboard|මුදල් අයකැමි පුවරුව)/);
+    assert.match(container.textContent ?? "", /(?:Welcome, Nadeesha!|ආයුබෝවන්, Nadeesha!)/);
+    assert.match(container.textContent ?? "", /(?:No invoices issued yet|තවම බිල්පත් නිකුත් කර නොමැත)/);
     assert.doesNotMatch(container.textContent ?? "", /Rs\. 284,500/);
     assert.doesNotMatch(container.textContent ?? "", /Owner Management Portal/);
     assert.equal(testDom.window.localStorage.length, 0);

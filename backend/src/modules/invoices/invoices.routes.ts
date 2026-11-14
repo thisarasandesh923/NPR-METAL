@@ -26,3 +26,4 @@ export function createInvoicesRouter(
 
   return router;
 }
+

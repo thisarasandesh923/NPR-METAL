@@ -3,6 +3,7 @@ import { fetchInvoiceDetail } from "../../../api/billing.ts";
 import { ApiError } from "../../../api/client.ts";
 import { reversePaymentEntry } from "../../../api/operations.ts";
 import { Icon } from "../../../components/ui/Icon.tsx";
+import { useLanguage } from "../../../i18n/LanguageContext.tsx";
 import type { UserRole } from "../../../types/auth.ts";
 import type {
   InvoiceDetail,
@@ -43,6 +44,7 @@ export function InvoiceDetailPage({
   onBack,
   onCreateAnother,
 }: InvoiceDetailPageProps) {
+  const { t } = useLanguage();
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(
     initialInvoice ?? null
   );
@@ -80,11 +82,26 @@ export function InvoiceDetailPage({
     }
   }, [initialInvoice, invoiceId, loadFromServer]);
 
+  const getStatusLabel = (status: InvoiceDetail["paymentStatus"]): string => {
+    switch (status) {
+      case "PAID":
+        return t("statusPaid");
+      case "PARTIALLY_PAID":
+        return t("statusPartiallyPaid");
+      case "UNPAID":
+        return t("statusUnpaid");
+      case "CANCELLED":
+        return t("statusCancelled");
+      default:
+        return status;
+    }
+  };
+
   if (loading) {
     return (
       <div className="mx-auto max-w-[1200px] p-6 md:p-10">
         <p className="text-sm font-semibold text-slate-500">
-          Loading persisted invoice record...
+          {t("loading")}
         </p>
       </div>
     );
@@ -105,7 +122,7 @@ export function InvoiceDetailPage({
             onClick={onBack}
             className="mt-4 rounded-xl bg-[#092547] px-4 py-2.5 text-xs font-bold text-white"
           >
-            Back
+            {t("back")}
           </button>
         </div>
       </div>
@@ -131,7 +148,7 @@ export function InvoiceDetailPage({
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#f58220]">
-              Permanent Issued Invoice
+              {t("invoiceDetailsCard")}
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-extrabold text-[#092547] md:text-3xl">
@@ -140,11 +157,11 @@ export function InvoiceDetailPage({
               <span
                 className={`rounded-full border px-3 py-1 text-xs font-extrabold ${getStatusClasses(invoice.paymentStatus)}`}
               >
-                {invoice.paymentStatus.replace("_", " ")}
+                {getStatusLabel(invoice.paymentStatus)}
               </span>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              Issued {formatColomboDateTime(invoice.issuedAt)} by{" "}
+              {formatColomboDateTime(invoice.issuedAt)} · {t("issuedByLabel")}{" "}
               <strong>{invoice.issuedByName}</strong>
             </p>
           </div>
@@ -155,7 +172,7 @@ export function InvoiceDetailPage({
               onClick={onBack}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
             >
-              Back
+              {t("backToInvoiceHistory")}
             </button>
             {onCreateAnother && (
               <button
@@ -163,7 +180,7 @@ export function InvoiceDetailPage({
                 onClick={onCreateAnother}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-[#092547] hover:bg-slate-50"
               >
-                + New Invoice
+                {t("createAnotherBtn")}
               </button>
             )}
             {canRecordPayment && (
@@ -173,7 +190,7 @@ export function InvoiceDetailPage({
                 className="inline-flex items-center gap-2 rounded-xl bg-[#124f8c] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#0d3f72]"
               >
                 <Icon name="cash" className="h-4 w-4" />
-                Record Cash Payment
+                {t("recordPaymentBtn")}
               </button>
             )}
             <button
@@ -182,7 +199,7 @@ export function InvoiceDetailPage({
               className="inline-flex items-center gap-2 rounded-xl bg-[#f58220] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#e77418]"
             >
               <Icon name="print" className="h-4 w-4" />
-              Print A5 Invoice
+              {t("printA5Btn")}
             </button>
           </div>
         </div>
@@ -191,21 +208,21 @@ export function InvoiceDetailPage({
           <div className="space-y-6">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-sm font-extrabold uppercase tracking-[0.06em] text-slate-400">
-                Customer &amp; Delivery Snapshot
+                {t("customerInfoCard")}
               </h2>
               <p className="mt-2 text-lg font-extrabold text-[#092547]">
                 {invoice.customerName}
               </p>
               <p className="mt-1 text-xs text-slate-600">
-                Phone: <strong>{invoice.customerPhone}</strong> · Location:{" "}
+                {t("customerPhone")}: <strong>{invoice.customerPhone}</strong> · {t("deliveryLocation")}:{" "}
                 <strong>{invoice.customerLocation}</strong>
               </p>
               <p className="mt-1 text-xs text-slate-600">
-                Transport:{" "}
+                {t("stepTransport")}:{" "}
                 <strong>
                   {invoice.hasTransport
-                    ? `With Transport (${formatLkr(invoice.transportFee)})`
-                    : "Without Transport (Customer Pickup)"}
+                    ? `${t("withTransport")} (${formatLkr(invoice.transportFee)})`
+                    : t("withoutTransport")}
                 </strong>
               </p>
             </section>
@@ -213,11 +230,11 @@ export function InvoiceDetailPage({
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h2 className="text-base font-extrabold text-[#092547]">
-                  Frozen Line Items
+                  {t("purchasedItemsCard")}
                 </h2>
                 <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
                   <Icon name="lock" className="h-3.5 w-3.5" />
-                  Immutable Snapshot
+                  {t("serverLockedPrices")}
                 </span>
               </div>
               <div className="overflow-x-auto">
@@ -225,10 +242,10 @@ export function InvoiceDetailPage({
                   <thead>
                     <tr className="bg-[#f8fafc]">
                       <th>#</th>
-                      <th>Material</th>
-                      <th className="text-right">Quantity (m³)</th>
-                      <th className="text-right">Unit Price</th>
-                      <th className="text-right">Line Total</th>
+                      <th>{t("materialCol")}</th>
+                      <th className="text-right">{t("quantityCol")}</th>
+                      <th className="text-right">{t("unitPriceCol")}</th>
+                      <th className="text-right">{t("lineTotalCol")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -255,24 +272,24 @@ export function InvoiceDetailPage({
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h2 className="text-base font-extrabold text-[#092547]">
-                  Append-Only Cash Payment History ({invoice.payments.length})
+                  {t("paymentLedgerCard")} ({invoice.payments.length})
                 </h2>
                 <span className="text-xs text-slate-400">Cash Only</span>
               </div>
               {invoice.payments.length === 0 ? (
                 <p className="p-5 text-xs text-slate-500">
-                  No cash payments have been recorded against this invoice yet.
+                  {t("noPaymentsYet")}
                 </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left">
                     <thead>
                       <tr className="bg-[#f8fafc]">
-                        <th>Receipt No.</th>
-                        <th>Received By</th>
-                        <th>Date / Time (Colombo)</th>
-                        <th>Notes</th>
-                        <th className="text-right">Amount</th>
+                        <th>{t("receiptNoCol")}</th>
+                        <th>{t("collectedByCol")}</th>
+                        <th>{t("paymentDateCol")}</th>
+                        <th>{t("remarks")}</th>
+                        <th className="text-right">{t("paymentAmountCol")}</th>
                         {userRole === "OWNER" && <th className="text-right">Owner</th>}
                       </tr>
                     </thead>
@@ -343,27 +360,27 @@ export function InvoiceDetailPage({
 
           <aside className="h-fit rounded-2xl bg-[#092547] p-6 text-white shadow-lg">
             <h2 className="border-b border-white/10 pb-4 text-base font-extrabold">
-              Authoritative Totals
+              {t("summaryTitle")}
             </h2>
             <div className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between text-blue-100/75">
-                <span>Subtotal</span>
+                <span>{t("subtotalPreview")}</span>
                 <strong className="text-white">{formatLkr(invoice.subtotal)}</strong>
               </div>
               <div className="flex justify-between text-blue-100/75">
-                <span>Transport Fee</span>
+                <span>{t("transportFee")}</span>
                 <strong className="text-white">
                   {formatLkr(invoice.transportFee)}
                 </strong>
               </div>
               <div className="flex justify-between border-t border-dashed border-white/20 pt-3">
-                <span className="font-bold">Grand Total</span>
+                <span className="font-bold">{t("grandTotal")}</span>
                 <strong className="text-xl font-extrabold text-[#ff9b43]">
                   {formatLkr(invoice.grandTotal)}
                 </strong>
               </div>
               <div className="flex justify-between text-blue-100/75">
-                <span>Total Paid</span>
+                <span>{t("paidAmount")}</span>
                 <strong className="text-emerald-300">
                   {formatLkr(invoice.paidAmount)}
                 </strong>
@@ -371,7 +388,7 @@ export function InvoiceDetailPage({
               <div className="rounded-xl bg-white/[0.08] p-4">
                 <div className="flex items-end justify-between">
                   <span className="text-xs font-bold text-blue-100/80">
-                    Outstanding Balance
+                    {t("balanceDue")}
                   </span>
                   <strong className="text-lg font-extrabold">
                     {formatLkr(invoice.balanceDue)}
@@ -483,14 +500,14 @@ export function InvoiceDetailPage({
                 onClick={() => setReversingPayment(null)}
                 className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-600"
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="submit"
                 disabled={reversingBusy}
                 className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700"
               >
-                {reversingBusy ? "Recording..." : "Confirm Entry Reversal"}
+                {reversingBusy ? t("saving") : "Confirm Entry Reversal"}
               </button>
             </div>
           </form>
@@ -499,4 +516,3 @@ export function InvoiceDetailPage({
     </>
   );
 }
-

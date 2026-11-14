@@ -37,3 +37,8 @@ Object.defineProperty(globalThis, "Event", {
   configurable: true,
   writable: true,
 });
+Object.defineProperty(globalThis, "localStorage", {
+  value: testDom.window.localStorage,
+  configurable: true,
+  writable: true,
+});

@@ -10,6 +10,7 @@ export const DEMO_CONFIGURED_PRICES: Record<MaterialName, number> = {
   Dust: 8000,
   "6×9": 10500,
   ABC: 11500,
+
 };
 
 export const DEMO_MATERIAL_OPTIONS = Object.keys(DEMO_CONFIGURED_PRICES) as MaterialName[];

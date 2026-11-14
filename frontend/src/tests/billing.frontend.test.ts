@@ -63,6 +63,7 @@ describe("Phase 4 Billing MVP — Frontend Invoice, Payment, A5 Print & Owner Vi
   });
 
   it("completes CASHIER invoice creation from live materials, A5 print rendering, and subsequent payment recording", async () => {
+    localStorage.setItem("npr_preferred_language", "en");
     const materials: MaterialCatalogItem[] = [
       { id: 1, code: "3/4", name: '3/4"', unit: "m³", currentUnitPrice: "12000.00", isActive: true },
       { id: 2, code: "DUST", name: "Dust", unit: "m³", currentUnitPrice: "8500.00", isActive: true },

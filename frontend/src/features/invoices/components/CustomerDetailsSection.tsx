@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { searchCustomers } from "../../../api/billing.ts";
 import { Icon } from "../../../components/ui/Icon.tsx";
+import { useLanguage } from "../../../i18n/LanguageContext.tsx";
 import type { CustomerRecord } from "../../../types/billing.ts";
 
 export interface CustomerDraft {
@@ -24,6 +25,7 @@ export function CustomerDetailsSection({
   onChangeDraft,
   disabled = false,
 }: CustomerDetailsSectionProps) {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState<CustomerRecord[]>([]);
   const [searching, setSearching] = useState(false);
@@ -68,8 +70,8 @@ export function CustomerDetailsSection({
         <div className="flex items-center gap-3">
           <span className="invoice-step">01</span>
           <div>
-            <h2>Customer Details</h2>
-            <p>Search existing customers or enter a new customer for this invoice</p>
+            <h2>{t("stepCustomer")}</h2>
+            <p>{t("stepCustomerSubtitle")}</p>
           </div>
         </div>
         {selectedCustomer && !disabled && (
@@ -78,7 +80,7 @@ export function CustomerDetailsSection({
             onClick={() => onSelectCustomer(null)}
             className="self-start rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-[#124f8c] hover:bg-slate-50 sm:self-auto"
           >
-            Change / Enter New Customer
+            {t("changeCustomer")}
           </button>
         )}
       </div>
@@ -88,13 +90,13 @@ export function CustomerDetailsSection({
           <div className="flex flex-col justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 sm:flex-row sm:items-center">
             <div>
               <span className="inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.06em] text-emerald-800">
-                Existing Customer #{selectedCustomer.id}
+                {t("selectedCustomerBadge")} #{selectedCustomer.id}
               </span>
               <p className="mt-1.5 text-base font-extrabold text-[#092547]">
                 {selectedCustomer.name}
               </p>
               <p className="mt-0.5 text-xs text-slate-600">
-                Phone: <strong>{selectedCustomer.phone}</strong> · Delivery:{" "}
+                {t("customerPhone")}: <strong>{selectedCustomer.phone}</strong> · {t("deliveryLocation")}:{" "}
                 <strong>{selectedCustomer.location}</strong>
               </p>
             </div>
@@ -105,7 +107,7 @@ export function CustomerDetailsSection({
         <div className="space-y-5 p-5 md:p-6">
           <div className="rounded-2xl border border-slate-200/80 bg-[#f8fafc] p-4">
             <label htmlFor="customer-search-input" className="form-label">
-              Find Existing Customer (Name, Phone, or Location)
+              {t("searchCustomerPlaceholder")}
             </label>
             <input
               id="customer-search-input"
@@ -113,11 +115,11 @@ export function CustomerDetailsSection({
               disabled={disabled}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search saved customers..."
+              placeholder={t("searchCustomerPlaceholder")}
               className="form-control bg-white"
             />
             {searching && (
-              <p className="mt-2 text-xs text-slate-400">Searching customers...</p>
+              <p className="mt-2 text-xs text-slate-400">{t("loading")}</p>
             )}
             {searchError && (
               <p className="mt-2 text-xs font-semibold text-rose-600">
@@ -146,7 +148,7 @@ export function CustomerDetailsSection({
 
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
             <label className="xl:col-span-2">
-              <span className="form-label">Customer / Company Name *</span>
+              <span className="form-label">{t("customerName")} *</span>
               <input
                 name="customerName"
                 className="form-control"
@@ -155,12 +157,12 @@ export function CustomerDetailsSection({
                 onChange={(e) =>
                   onChangeDraft({ ...customerDraft, name: e.target.value })
                 }
-                placeholder="Enter customer or company name"
+                placeholder={t("customerName")}
                 required
               />
             </label>
             <label>
-              <span className="form-label">Phone Number *</span>
+              <span className="form-label">{t("customerPhone")} *</span>
               <input
                 name="customerPhone"
                 className="form-control"
@@ -175,7 +177,7 @@ export function CustomerDetailsSection({
               />
             </label>
             <label className="sm:col-span-2 xl:col-span-4">
-              <span className="form-label">Location / Delivery Address *</span>
+              <span className="form-label">{t("deliveryLocation")} *</span>
               <input
                 name="customerLocation"
                 className="form-control"
@@ -184,7 +186,7 @@ export function CustomerDetailsSection({
                 onChange={(e) =>
                   onChangeDraft({ ...customerDraft, location: e.target.value })
                 }
-                placeholder="Enter delivery site or address"
+                placeholder={t("deliveryLocation")}
                 required
               />
             </label>

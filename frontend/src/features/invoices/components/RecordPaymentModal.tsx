@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { recordCashPaymentRequest } from "../../../api/billing.ts";
 import { ApiError } from "../../../api/client.ts";
 import { Icon } from "../../../components/ui/Icon.tsx";
+import { useLanguage } from "../../../i18n/LanguageContext.tsx";
 import type { InvoiceDetail } from "../../../types/billing.ts";
 import { formatLkr } from "../../../utils/formatters.ts";
 
@@ -23,6 +24,7 @@ export function RecordPaymentModal({
   onClose,
   onSuccess,
 }: RecordPaymentModalProps) {
+  const { t } = useLanguage();
   const [amount, setAmount] = useState(invoice.balanceDue);
   const [notes, setNotes] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(() => generateUuid());
@@ -79,13 +81,13 @@ export function RecordPaymentModal({
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.06em] text-[#f58220]">
-              Cash Receipt Entry
+              {t("recordCashPaymentTitle")}
             </p>
             <h2
               id="record-payment-title"
               className="mt-1 text-lg font-extrabold text-[#092547]"
             >
-              Record Payment · {invoice.invoiceNumber}
+              {t("recordPaymentSubtitle")} · {invoice.invoiceNumber}
             </h2>
           </div>
           <button
@@ -101,11 +103,11 @@ export function RecordPaymentModal({
 
         <div className="mt-4 rounded-xl bg-[#f8fafc] p-3.5 text-xs">
           <div className="flex justify-between">
-            <span className="text-slate-500">Customer:</span>
+            <span className="text-slate-500">{t("customer")}:</span>
             <strong className="text-[#092547]">{invoice.customerName}</strong>
           </div>
           <div className="mt-1 flex justify-between">
-            <span className="text-slate-500">Outstanding Balance:</span>
+            <span className="text-slate-500">{t("balanceDue")}:</span>
             <strong className="text-sm text-[#e77418]">
               {formatLkr(invoice.balanceDue)}
             </strong>
@@ -128,7 +130,7 @@ export function RecordPaymentModal({
                 htmlFor="payment-amount-input"
                 className="text-xs font-bold uppercase tracking-[0.06em] text-slate-600"
               >
-                Cash Received (LKR) *
+                {t("paymentAmountLkr")} *
               </label>
               <button
                 type="button"
@@ -136,7 +138,7 @@ export function RecordPaymentModal({
                 onClick={() => handleAmountChange(invoice.balanceDue)}
                 className="text-xs font-bold text-[#124f8c] hover:underline"
               >
-                Fill Full Balance
+                {t("payFullBalanceBtn")}
               </button>
             </div>
             <input
@@ -157,7 +159,7 @@ export function RecordPaymentModal({
               htmlFor="payment-notes-input"
               className="mb-1.5 block text-xs font-bold uppercase tracking-[0.06em] text-slate-600"
             >
-              Notes (Optional)
+              {t("receiptNumberOptional")}
             </label>
             <input
               id="payment-notes-input"
@@ -170,7 +172,7 @@ export function RecordPaymentModal({
                 setIdempotencyKey(generateUuid());
               }}
               className="form-control"
-              placeholder="e.g. Second cash installment"
+              placeholder="e.g. Receipt #12345"
             />
           </div>
 
@@ -181,14 +183,14 @@ export function RecordPaymentModal({
               onClick={onClose}
               className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
             >
-              Cancel
+              {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="flex-1 rounded-xl bg-[#f58220] px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#e77418] disabled:opacity-60"
             >
-              {submitting ? "Recording..." : "Save Cash Payment"}
+              {submitting ? t("saving") : t("confirmPaymentBtn")}
             </button>
           </div>
         </form>

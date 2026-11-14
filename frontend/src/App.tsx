@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MainLayout } from "./components/layout/MainLayout.tsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.tsx";
+import { LanguageProvider } from "./i18n/LanguageContext.tsx";
 import { OwnerApprovalsPage } from "./features/approvals/OwnerApprovalsPage.tsx";
 import {
   getDefaultScreenForRole,
@@ -158,7 +159,9 @@ export function AuthenticatedAppShell() {
 export function App() {
   return (
     <AuthProvider>
-      <AuthenticatedAppShell />
+      <LanguageProvider>
+        <AuthenticatedAppShell />
+      </LanguageProvider>
     </AuthProvider>
   );
 }

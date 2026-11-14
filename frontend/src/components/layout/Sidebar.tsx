@@ -1,5 +1,7 @@
 import { Icon } from "../ui/Icon.tsx";
 import { getNavItemsForRole } from "../../features/auth/authNavigation.ts";
+import { useLanguage } from "../../i18n/LanguageContext.tsx";
+import type { Translations } from "../../i18n/translations.ts";
 import type { AppScreen, AuthUser } from "../../types/auth.ts";
 
 interface SidebarProps {
@@ -12,6 +14,19 @@ interface SidebarProps {
   isLoggingOut: boolean;
   logoutError: string | null;
 }
+
+const SCREEN_NAV_KEYS: Record<AppScreen, keyof Translations> = {
+  "cashier-dashboard": "navCashierDashboard",
+  "new-invoice": "navNewInvoice",
+  invoices: "navInvoiceHistory",
+  "daily-operations": "navDailyOperations",
+  "owner-dashboard": "navOwnerDashboard",
+  approvals: "navApprovals",
+  "material-prices": "navPriceManagement",
+  "workers-machines": "navWorkersMachines",
+  payroll: "navPayroll",
+  "invoice-detail": "invoiceDetailTitle",
+};
 
 function getInitials(fullName: string): string {
   const parts = fullName
@@ -37,8 +52,9 @@ export function Sidebar({
   isLoggingOut,
   logoutError,
 }: SidebarProps) {
+  const { t, isSinhala, toggleLanguage } = useLanguage();
   const navItems = getNavItemsForRole(user.role);
-  const roleLabel = user.role === "OWNER" ? "Owner" : "Cashier";
+  const roleLabel = user.role === "OWNER" ? t("roleOwner") : t("roleCashier");
 
   return (
     <>
@@ -62,7 +78,7 @@ export function Sidebar({
               NPR <span className="text-[#f58220]">METAL</span>
             </p>
             <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.17em] text-blue-200/70">
-              Crusher &amp; Workshop
+              {t("appCrusherTagline")}
             </p>
           </div>
           <button
@@ -76,12 +92,26 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 overflow-y-auto px-4 py-7" aria-label="Primary Navigation">
-          <p className="mb-3 px-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-200/50">
-            {roleLabel} Workspace
-          </p>
+          <div className="mb-3 flex items-center justify-between px-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-200/50">
+              {roleLabel} {t("workspace")}
+            </p>
+            {/* Quick Language Toggle in Sidebar for mobile */}
+            <button
+              type="button"
+              onClick={toggleLanguage}
+              className="text-[11px] font-bold text-[#f58220] transition hover:text-[#ff9b43] lg:hidden"
+            >
+              {isSinhala ? "English" : "සිංහල"}
+            </button>
+          </div>
           <div className="space-y-1.5">
             {navItems.map((item) => {
               const active = item.screen !== undefined && item.screen === currentScreen;
+              const localizedLabel = SCREEN_NAV_KEYS[item.screen]
+                ? t(SCREEN_NAV_KEYS[item.screen])
+                : item.label;
+
               return (
                 <button
                   key={item.label}
@@ -97,7 +127,7 @@ export function Sidebar({
                   }`}
                 >
                   <Icon name={item.icon} className="h-[20px] w-[20px] shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <span className="min-w-0 flex-1 truncate">{localizedLabel}</span>
                 </button>
               );
             })}
@@ -132,7 +162,7 @@ export function Sidebar({
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-blue-100/75 transition hover:bg-white/8 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Icon name="logout" className="h-5 w-5" />
-            {isLoggingOut ? "Signing out..." : "Logout"}
+            {isLoggingOut ? t("loggingOut") : t("logout")}
           </button>
         </div>
       </aside>

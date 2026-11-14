@@ -1,3 +1,4 @@
+import { useLanguage } from "../../../i18n/LanguageContext.tsx";
 import { formatLkr } from "../../../utils/formatters.ts";
 import type { PaymentStatus } from "../../../types/invoice.ts";
 
@@ -24,14 +25,23 @@ export function PaymentDetailsSection({
   overpaymentAmount,
   disabled = false,
 }: PaymentDetailsSectionProps) {
+  const { t } = useLanguage();
+
+  const getStatusLabel = (): string => {
+    if (isOverpayment) return "OVERPAYMENT";
+    if (balance === 0 && grandTotal > 0) return t("statusPaid");
+    if (paidAmount === 0) return t("statusUnpaid");
+    return t("statusPartiallyPaid");
+  };
+
   return (
     <section className="invoice-panel">
       <div className="invoice-panel-heading flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="invoice-step">04</span>
           <div>
-            <h2>Initial Cash Payment</h2>
-            <p>Enter cash received now (0 for credit invoice, or partial/full payment)</p>
+            <h2>{t("stepPayment")}</h2>
+            <p>{t("stepPaymentSubtitle")}</p>
           </div>
         </div>
         {!disabled && (
@@ -41,14 +51,14 @@ export function PaymentDetailsSection({
               onClick={() => onChangeCashReceived("0.00")}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50"
             >
-              Credit (0)
+              {t("creditInvoiceShortcut")}
             </button>
             <button
               type="button"
               onClick={() => onChangeCashReceived(grandTotal.toFixed(2))}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-[#124f8c] hover:bg-slate-50"
             >
-              Pay Full
+              {t("fullPaymentShortcut")}
             </button>
           </div>
         )}
@@ -56,7 +66,7 @@ export function PaymentDetailsSection({
 
       <div className="grid gap-5 p-5 md:grid-cols-2 md:p-6">
         <label>
-          <span className="form-label">Initial Cash Received (LKR)</span>
+          <span className="form-label">{t("initialCashReceived")}</span>
           <div className="relative">
             <input
               name="initialPaymentAmount"
@@ -79,7 +89,7 @@ export function PaymentDetailsSection({
         </label>
 
         <div>
-          <span className="form-label">Preview Status</span>
+          <span className="form-label">{t("status")}</span>
           <div
             className={`payment-state ${
               isOverpayment
@@ -92,7 +102,7 @@ export function PaymentDetailsSection({
             }`}
           >
             <span className={isOverpayment ? "bg-rose-500" : ""} />
-            {paymentStatus}
+            {getStatusLabel()}
           </div>
         </div>
       </div>

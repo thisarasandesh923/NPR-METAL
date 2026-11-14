@@ -26,16 +26,63 @@ export function securityHeadersMiddleware(
   next();
 }
 
+export function isPrivateNetworkOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return false;
+    }
+    const hostname = url.hostname;
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "[::1]"
+    ) {
+      return true;
+    }
+    // 10.0.0.0/8
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+      return true;
+    }
+    // 172.16.0.0/12 (172.16.x.x - 172.31.x.x)
+    const match172 = /^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(hostname);
+    if (match172) {
+      const secondOctet = Number(match172[1]);
+      if (secondOctet >= 16 && secondOctet <= 31) {
+        return true;
+      }
+    }
+    // 192.168.0.0/16
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function createCorsAndOriginMiddleware(
   allowedOrigins: ReadonlySet<string>,
-  _isProduction: boolean
+  isProduction: boolean
 ) {
+  const isOriginAllowed = (origin: string): boolean => {
+    if (allowedOrigins.has(origin)) {
+      return true;
+    }
+    if (!isProduction && isPrivateNetworkOrigin(origin)) {
+      return true;
+    }
+    return false;
+  };
+
   return (req: Request, res: Response, next: NextFunction): void => {
     const originHeader = req.get("origin");
     const secFetchSite = req.get("sec-fetch-site")?.trim().toLowerCase();
 
     if (originHeader !== undefined) {
-      if (!allowedOrigins.has(originHeader)) {
+      if (!isOriginAllowed(originHeader)) {
         next(
           new ForbiddenError(
             "Cross-origin requests from this origin are not allowed.",
@@ -76,7 +123,7 @@ export function createCorsAndOriginMiddleware(
           } catch {
             refererOrigin = null;
           }
-          if (!refererOrigin || !allowedOrigins.has(refererOrigin)) {
+          if (!refererOrigin || !isOriginAllowed(refererOrigin)) {
             next(
               new ForbiddenError(
                 "Request referer origin is not allowed.",

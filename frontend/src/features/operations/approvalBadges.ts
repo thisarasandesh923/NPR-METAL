@@ -18,8 +18,23 @@ export function getApprovalStatusBadgeClasses(
 }
 
 export function formatApprovalStatusLabel(
-  status: OperationalApprovalStatus
+  status: OperationalApprovalStatus,
+  language: "en" | "si" = "en"
 ): string {
+  if (language === "si") {
+    switch (status) {
+      case "RETURNED_FOR_CORRECTION":
+        return "සංශෝධනයට ආපසු එවූ";
+      case "SUBMITTED":
+        return "අනුමැතියට යොමු කළා";
+      case "APPROVED":
+        return "අනුමතයි";
+      case "CANCELLED":
+        return "අවලංගුයි";
+      default:
+        return "කෙටුම්පත";
+    }
+  }
   switch (status) {
     case "RETURNED_FOR_CORRECTION":
       return "Returned for Correction";
@@ -33,4 +48,3 @@ export function formatApprovalStatusLabel(
       return "Draft";
   }
 }
-

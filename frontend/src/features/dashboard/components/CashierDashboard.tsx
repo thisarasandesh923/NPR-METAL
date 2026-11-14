@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchInvoices } from "../../../api/billing.ts";
 import { ApiError } from "../../../api/client.ts";
 import { Icon } from "../../../components/ui/Icon.tsx";
+import { useLanguage } from "../../../i18n/LanguageContext.tsx";
 import type { AuthUser } from "../../../types/auth.ts";
 import type { InvoiceSummary } from "../../../types/billing.ts";
 import {
@@ -30,6 +31,7 @@ export function CashierDashboard({
   onOpenHistory,
   onSelectInvoice,
 }: CashierDashboardProps) {
+  const { t } = useLanguage();
   const firstName = getFirstName(user.fullName);
   const [recentInvoices, setRecentInvoices] = useState<InvoiceSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,18 +58,35 @@ export function CashierDashboard({
     void loadRecent();
   }, [loadRecent]);
 
+  const getStatusLabel = (status: InvoiceSummary["paymentStatus"]): string => {
+    switch (status) {
+      case "PAID":
+        return t("statusPaid");
+      case "PARTIALLY_PAID":
+        return t("statusPartiallyPaid");
+      case "UNPAID":
+        return t("statusUnpaid");
+      case "CANCELLED":
+        return t("statusCancelled");
+      default:
+        return status;
+    }
+  };
+
   return (
     <div className="mx-auto max-w-[1500px] p-4 md:p-8 lg:p-10">
       <section className="mb-8 flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
         <div>
           <p className="mb-2 text-sm font-bold text-[#f58220]">
-            Welcome, {firstName}!
+            {t("welcomeCashier")}, {firstName}!
           </p>
           <h1 className="text-2xl font-extrabold tracking-tight text-[#092547] md:text-[32px]">
-            Cashier Dashboard
+            {t("cashierDashboardTitle")}
           </h1>
           <p className="mt-2 text-sm text-slate-500 md:text-[15px]">
-            Signed in as <span className="font-semibold text-[#092547]">{user.fullName}</span> ({user.role}).
+            {t("signedInAs")}{" "}
+            <span className="font-semibold text-[#092547]">{user.fullName}</span> (
+            {user.role === "CASHIER" ? t("roleCashier") : t("roleOwner")}).
           </p>
         </div>
 
@@ -78,7 +97,7 @@ export function CashierDashboard({
             className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-[#092547] shadow-sm transition hover:bg-slate-50"
           >
             <Icon name="history" className="h-5 w-5 text-[#124f8c]" />
-            Invoice History &amp; Payments
+            {t("invoiceHistoryAndPayments")}
           </button>
           <button
             type="button"
@@ -88,7 +107,7 @@ export function CashierDashboard({
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20">
               <Icon name="plus" className="h-5 w-5" />
             </span>
-            Create New Invoice
+            {t("createNewInvoice")}
           </button>
         </div>
       </section>
@@ -106,10 +125,10 @@ export function CashierDashboard({
         <div className="flex flex-col justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center md:px-6">
           <div>
             <h2 className="text-lg font-extrabold text-[#092547]">
-              Recent Issued Invoices (Live PostgreSQL)
+              {t("recentIssuedInvoices")}
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              Open any saved invoice to record partial/final cash payments or print A5 receipt
+              {t("recentInvoicesSubtitle")}
             </p>
           </div>
           <button
@@ -117,22 +136,22 @@ export function CashierDashboard({
             onClick={onOpenHistory}
             className="flex items-center gap-2 self-start text-sm font-bold text-[#e77418] transition hover:text-[#bc5810] sm:self-auto"
           >
-            View Full History
+            {t("viewFullHistory")}
             <Icon name="arrow" className="h-4 w-4" />
           </button>
         </div>
 
         {loading ? (
           <p className="p-6 text-sm text-slate-500">
-            Loading saved invoices from PostgreSQL...
+            {t("loading")}
           </p>
         ) : recentInvoices.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-base font-bold text-[#092547]">
-              No invoices issued yet
+              {t("noInvoicesYet")}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Click &quot;Create New Invoice&quot; to record a customer sale and print an A5 invoice.
+              {t("noInvoicesYetSubtitle")}
             </p>
           </div>
         ) : (
@@ -140,14 +159,14 @@ export function CashierDashboard({
             <table className="w-full min-w-[850px] border-collapse text-left">
               <thead>
                 <tr className="bg-[#f8fafc]">
-                  <th>Invoice No.</th>
-                  <th>Customer</th>
-                  <th>Issued At</th>
-                  <th className="text-right">Grand Total</th>
-                  <th className="text-right">Paid</th>
-                  <th className="text-right">Balance Due</th>
-                  <th>Status</th>
-                  <th className="text-right">Action</th>
+                  <th>{t("invoiceNo")}</th>
+                  <th>{t("customer")}</th>
+                  <th>{t("issuedAt")}</th>
+                  <th className="text-right">{t("grandTotal")}</th>
+                  <th className="text-right">{t("paidAmount")}</th>
+                  <th className="text-right">{t("balanceDue")}</th>
+                  <th>{t("status")}</th>
+                  <th className="text-right">{t("actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,11 +179,11 @@ export function CashierDashboard({
                       {invoice.invoiceNumber}
                     </td>
                     <td>
-                      <p className="font-bold text-slate-800">
+                      <p className="font-bold text-[#092547]">
                         {invoice.customerName}
                       </p>
-                      <p className="text-[11px] text-slate-400">
-                        {invoice.customerPhone}
+                      <p className="text-xs text-slate-400">
+                        {invoice.customerPhone ?? "—"}
                       </p>
                     </td>
                     <td className="text-slate-500">
@@ -173,10 +192,10 @@ export function CashierDashboard({
                     <td className="text-right font-extrabold text-[#092547]">
                       {formatLkr(invoice.grandTotal)}
                     </td>
-                    <td className="text-right font-bold text-emerald-700">
+                    <td className="text-right font-bold text-emerald-600">
                       {formatLkr(invoice.paidAmount)}
                     </td>
-                    <td className="text-right font-extrabold text-[#e77418]">
+                    <td className="text-right font-extrabold text-amber-600">
                       {formatLkr(invoice.balanceDue)}
                     </td>
                     <td>
@@ -190,7 +209,7 @@ export function CashierDashboard({
                         }`}
                       >
                         <span />
-                        {invoice.paymentStatus.replace("_", " ")}
+                        {getStatusLabel(invoice.paymentStatus)}
                       </span>
                     </td>
                     <td className="text-right">
@@ -199,7 +218,7 @@ export function CashierDashboard({
                         onClick={() => onSelectInvoice(invoice.id)}
                         className="rounded-lg bg-[#edf3fa] px-3 py-1.5 text-xs font-bold text-[#124f8c] hover:bg-[#dce8f6]"
                       >
-                        Open / Print
+                        {t("viewInvoice")}
                       </button>
                     </td>
                   </tr>
@@ -211,7 +230,7 @@ export function CashierDashboard({
       </section>
 
       <p className="mt-6 text-center text-[11px] text-slate-400">
-        NPR Metal Crusher Management System · Cashier Workstation
+        NPR Metal Crusher Management System · {t("roleCashier")} {t("workspace")}
       </p>
     </div>
   );

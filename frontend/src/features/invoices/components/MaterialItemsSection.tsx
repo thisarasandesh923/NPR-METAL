@@ -1,4 +1,5 @@
 import { Icon } from "../../../components/ui/Icon.tsx";
+import { useLanguage } from "../../../i18n/LanguageContext.tsx";
 import type { MaterialCatalogItem } from "../../../types/billing.ts";
 import { formatLkr } from "../../../utils/formatters.ts";
 
@@ -27,6 +28,7 @@ export function MaterialItemsSection({
   onRemoveItem,
   disabled = false,
 }: MaterialItemsSectionProps) {
+  const { t } = useLanguage();
   const materialsById = new Map(materials.map((m) => [m.id, m]));
 
   return (
@@ -35,13 +37,13 @@ export function MaterialItemsSection({
         <div className="flex items-center gap-3">
           <span className="invoice-step">02</span>
           <div>
-            <h2>Material Details</h2>
-            <p>Enter quantities in cubic metres (m³) using PostgreSQL catalogue prices</p>
+            <h2>{t("stepMaterials")}</h2>
+            <p>{t("stepMaterialsSubtitle")}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-bold text-[#124f8c]">
           <Icon name="lock" className="h-3.5 w-3.5" />
-          Server-Locked Unit Prices
+          {t("serverLockedPrices")}
         </div>
       </div>
 
@@ -50,11 +52,11 @@ export function MaterialItemsSection({
           <thead>
             <tr className="bg-[#f8fafc] text-left">
               <th className="w-14">#</th>
-              <th>Material</th>
-              <th>Quantity (m³)</th>
-              <th>Unit Price (LKR / m³)</th>
-              <th className="text-right">Preview Line Total</th>
-              <th className="w-20 text-center">Remove</th>
+              <th>{t("materialCol")}</th>
+              <th>{t("quantityCol")}</th>
+              <th>{t("unitPriceCol")}</th>
+              <th className="text-right">{t("lineTotalCol")}</th>
+              <th className="w-20 text-center">{t("removeCol")}</th>
             </tr>
           </thead>
           <tbody>
@@ -158,7 +160,7 @@ export function MaterialItemsSection({
           className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-xs font-bold text-[#124f8c] transition hover:border-[#f58220] hover:bg-orange-50/40 hover:text-[#e77418] disabled:opacity-40"
         >
           <Icon name="plus" className="h-4 w-4" />
-          Add Material Item
+          {t("addLineItem")}
         </button>
       </div>
     </section>

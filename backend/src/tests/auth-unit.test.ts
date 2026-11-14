@@ -164,4 +164,66 @@ describe("Phase 3A — Auth Unit Tests (Hashing, Cookies, SecurityConfig & RBAC)
     );
     assert.equal((capturedErr as { statusCode?: number })?.statusCode, 403);
   });
+
+  it("permits local LAN RFC 1918 private origins in development and rejects them in production", async () => {
+    const { isPrivateNetworkOrigin, createCorsAndOriginMiddleware } = await import(
+      "../middleware/security.middleware.js"
+    );
+
+    // Private network helper assertions
+    assert.equal(isPrivateNetworkOrigin("http://localhost:5173"), true);
+    assert.equal(isPrivateNetworkOrigin("http://127.0.0.1:5173"), true);
+    assert.equal(isPrivateNetworkOrigin("http://192.168.8.126:5173"), true);
+    assert.equal(isPrivateNetworkOrigin("http://10.0.1.50:5173"), true);
+    assert.equal(isPrivateNetworkOrigin("http://172.20.10.2:5173"), true);
+    assert.equal(isPrivateNetworkOrigin("http://172.15.0.1:5173"), false); // outside 172.16-31
+    assert.equal(isPrivateNetworkOrigin("http://172.32.0.1:5173"), false); // outside 172.16-31
+    assert.equal(isPrivateNetworkOrigin("https://malicious-external.com"), false);
+    assert.equal(isPrivateNetworkOrigin("not-a-valid-url"), false);
+
+    const devOrigins = new Set(["http://localhost:5173"]);
+    const devMiddleware = createCorsAndOriginMiddleware(devOrigins, false);
+    const prodOrigins = new Set(["https://billing.nprcrusher.lk"]);
+    const prodMiddleware = createCorsAndOriginMiddleware(prodOrigins, true);
+
+    // 1. Mobile LAN origin in DEV -> Allowed
+    let passed = false;
+    let devErr: unknown = null;
+    const reqLanDev = {
+      get: (header: string) => (header.toLowerCase() === "origin" ? "http://192.168.8.126:5173" : undefined),
+      method: "POST",
+    } as unknown as Request;
+    const headersSet: Record<string, string> = {};
+    const resLanDev = {
+      setHeader: (k: string, v: string) => { headersSet[k] = v; },
+    } as unknown as Response;
+
+    devMiddleware(reqLanDev, resLanDev, (err?: unknown) => {
+      if (err) devErr = err;
+      else passed = true;
+    });
+    assert.equal(passed, true, "Mobile LAN origin must pass CORS in development");
+    assert.equal(devErr, null);
+    assert.equal(headersSet["Access-Control-Allow-Origin"], "http://192.168.8.126:5173");
+    assert.equal(headersSet["Access-Control-Allow-Credentials"], "true");
+
+    // 2. Mobile LAN origin in PROD without whitelist -> Rejected with 403 ORIGIN_NOT_ALLOWED
+    let prodErr: unknown = null;
+    let prodPassed = false;
+    const reqLanProd = {
+      get: (header: string) => (header.toLowerCase() === "origin" ? "http://192.168.8.126:5173" : undefined),
+      method: "POST",
+    } as unknown as Request;
+    const resLanProd = {
+      setHeader: () => {},
+    } as unknown as Response;
+
+    prodMiddleware(reqLanProd, resLanProd, (err?: unknown) => {
+      if (err) prodErr = err;
+      else prodPassed = true;
+    });
+    assert.equal(prodPassed, false, "Mobile LAN origin must be blocked in production unless in ALLOWED_ORIGINS");
+    assert.equal((prodErr as { statusCode?: number })?.statusCode, 403);
+    assert.equal((prodErr as { code?: string })?.code, "ORIGIN_NOT_ALLOWED");
+  });
 });

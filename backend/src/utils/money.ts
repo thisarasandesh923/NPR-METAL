@@ -50,3 +50,4 @@ export function computeLineTotalCents(
   const productMilliCents = quantityMilli * unitPriceCents;
   return (productMilliCents + 500n) / 1000n;
 }
+

@@ -20,7 +20,8 @@
     "migrate:status": "tsx src/scripts/migration-status.ts",
     "migrate:dry-run": "tsx src/scripts/run-migrations.ts --dry-run",
     "migrate:up": "tsx src/scripts/run-migrations.ts",
-    "migrate:create": "node-pg-migrate create -m ../database/migrations -j sql --migration-filename-format index"
+    "migrate:create": "node-pg-migrate create -m ../database/migrations -j sql --migration-filename-format index",
+    "onboard:users": "tsx src/scripts/onboard-users.ts"
   },
   "keywords": [],
   "author": "",

@@ -1,3 +1,5 @@
+import { useLanguage } from "../../../i18n/LanguageContext.tsx";
+
 interface TransportDetailsSectionProps {
   withTransport: boolean;
   transportFee: string;
@@ -13,13 +15,15 @@ export function TransportDetailsSection({
   onChangeTransportFee,
   disabled = false,
 }: TransportDetailsSectionProps) {
+  const { t } = useLanguage();
+
   return (
     <section className="invoice-panel">
       <div className="invoice-panel-heading">
         <span className="invoice-step">03</span>
         <div>
-          <h2>Transport Details</h2>
-          <p>Select delivery transport or customer self-pickup</p>
+          <h2>{t("stepTransport")}</h2>
+          <p>{t("stepTransportSubtitle")}</p>
         </div>
       </div>
       <div className="p-5 md:p-6">
@@ -32,8 +36,8 @@ export function TransportDetailsSection({
           >
             <span className="option-radio">{withTransport && <span />}</span>
             <span>
-              <strong>With Transport</strong>
-              <small>Delivery to site included</small>
+              <strong>{t("withTransport")}</strong>
+              <small>{t("withTransportSubtitle")}</small>
             </span>
           </button>
           <button
@@ -44,14 +48,14 @@ export function TransportDetailsSection({
           >
             <span className="option-radio">{!withTransport && <span />}</span>
             <span>
-              <strong>Without Transport</strong>
-              <small>Customer self-pickup (Rs. 0.00)</small>
+              <strong>{t("withoutTransport")}</strong>
+              <small>{t("withoutTransportSubtitle")}</small>
             </span>
           </button>
         </div>
         {withTransport && (
           <label className="mt-5 block max-w-sm">
-            <span className="form-label">Transport Fee (LKR)</span>
+            <span className="form-label">{t("transportFeeLkr")}</span>
             <div className="relative">
               <input
                 name="transportFee"

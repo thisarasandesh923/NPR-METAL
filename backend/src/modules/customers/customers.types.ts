@@ -22,3 +22,4 @@ export interface CreateCustomerInput {
   location: string;
   notes?: string | null;
 }
+

@@ -35,6 +35,7 @@ import {
   formatApprovalStatusLabel,
   getApprovalStatusBadgeClasses,
 } from "./approvalBadges.ts";
+import { useLanguage } from "../../i18n/LanguageContext.tsx";
 import {
   colomboTodayIsoDate,
   previewIntervalNetHours,
@@ -102,6 +103,7 @@ interface EditableProductionRow {
 }
 
 export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
+  const { t, language } = useLanguage();
   const today = colomboTodayIsoDate();
   const [activeTab, setActiveTab] = useState<OpTab>("attendance");
   const [dateFrom, setDateFrom] = useState(today);
@@ -555,13 +557,13 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
       <div className="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-[#f58220]">
-            Spreadsheet Daily Operations
+            {t("workspaceLabel")}
           </p>
           <h1 className="mt-1 text-2xl font-extrabold text-[#092547] md:text-3xl">
-            Daily Workshop Logs
+            {t("dailyOpsTitle")}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Tab across cells to enter attendance, machine operating hours, and daily crushed metal output (m³). Drafts can be edited until submitted &amp; approved by Owner.
+            {t("dailyOpsSubtitle")}
           </p>
         </div>
 
@@ -576,7 +578,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
             onClick={addRowForActiveTab}
             className="rounded-xl bg-[#f58220] px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[#df7318]"
           >
-            + Add Row
+            {t("addNewRowBtn")}
           </button>
           <button
             type="button"
@@ -600,7 +602,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                 : "text-slate-600 hover:text-[#092547]"
             }`}
           >
-            Worker Attendance ({filteredAtt.length})
+            {t("tabAttendance")} ({filteredAtt.length})
           </button>
           <button
             type="button"
@@ -611,7 +613,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                 : "text-slate-600 hover:text-[#092547]"
             }`}
           >
-            Machine Hours ({filteredMach.length})
+            {t("tabMachineHours")} ({filteredMach.length})
           </button>
           <button
             type="button"
@@ -622,7 +624,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                 : "text-slate-600 hover:text-[#092547]"
             }`}
           >
-            Metal Production m³ ({filteredProd.length})
+            {t("tabProduction")} ({filteredProd.length})
           </button>
         </div>
 
@@ -686,17 +688,17 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
           <table className="w-full min-w-[1050px] border-collapse text-left text-xs">
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-3 py-3">Date</th>
-                <th className="px-3 py-3">Worker</th>
-                <th className="px-3 py-3">Start</th>
-                <th className="px-3 py-3">End</th>
-                <th className="px-3 py-3">Overnight</th>
-                <th className="px-3 py-3">Break (m)</th>
-                <th className="px-3 py-3 text-right">Net Hrs (Preview)</th>
-                <th className="px-3 py-3">Overtime (h)</th>
-                <th className="px-3 py-3">Remarks</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3 text-right">Actions</th>
+                <th className="px-3 py-3">{t("workDateCol")}</th>
+                <th className="px-3 py-3">{t("workerCol")}</th>
+                <th className="px-3 py-3">{t("startTimeCol")}</th>
+                <th className="px-3 py-3">{t("endTimeCol")}</th>
+                <th className="px-3 py-3">{t("crossesMidnightCol")}</th>
+                <th className="px-3 py-3">{t("breakMinsCol")}</th>
+                <th className="px-3 py-3 text-right">{t("hoursWorkedCol")}</th>
+                <th className="px-3 py-3">{t("overtimeHoursCol")}</th>
+                <th className="px-3 py-3">{t("remarks")}</th>
+                <th className="px-3 py-3">{t("status")}</th>
+                <th className="px-3 py-3 text-right">{t("actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -883,8 +885,8 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                           }`}
                         >
                           {row.approvalStatus === "NEW"
-                            ? "Unsaved Row"
-                            : formatApprovalStatusLabel(row.approvalStatus)}
+                            ? (language === "si" ? "සුරැකි නැත" : "Unsaved Row")
+                            : formatApprovalStatusLabel(row.approvalStatus, language)}
                         </span>
                       </td>
                       <td className="px-2 py-2 text-right">
@@ -897,7 +899,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                                 onClick={() => void saveAttendanceRow(row, false)}
                                 className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold text-[#092547] hover:bg-slate-50"
                               >
-                                Save Draft
+                                {t("saveDraftBtn")}
                               </button>
                               <button
                                 type="button"
@@ -905,7 +907,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                                 onClick={() => void saveAttendanceRow(row, true)}
                                 className="rounded-lg bg-[#092547] px-2.5 py-1 font-bold text-white hover:bg-[#103462]"
                               >
-                                Submit
+                                {t("submit")}
                               </button>
                               <button
                                 type="button"
@@ -920,7 +922,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                                 }
                                 className="rounded-lg border border-rose-200 px-2 py-1 font-bold text-rose-700 hover:bg-rose-50"
                               >
-                                Cancel
+                                {t("cancel")}
                               </button>
                             </>
                           )}
@@ -936,7 +938,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                               }
                               className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
                             >
-                              History
+                              {t("viewHistoryBtn")}
                             </button>
                           )}
                         </div>
@@ -960,18 +962,18 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
           <table className="w-full min-w-[1100px] border-collapse text-left text-xs">
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-3 py-3">Date</th>
-                <th className="px-3 py-3">Machine</th>
-                <th className="px-3 py-3">Operator</th>
-                <th className="px-3 py-3">Start</th>
-                <th className="px-3 py-3">End</th>
-                <th className="px-3 py-3">Overnight</th>
-                <th className="px-3 py-3">Downtime (m)</th>
-                <th className="px-3 py-3">Downtime Reason</th>
-                <th className="px-3 py-3 text-right">Net Hrs</th>
+                <th className="px-3 py-3">{t("workDateCol")}</th>
+                <th className="px-3 py-3">{t("machineCol")}</th>
+                <th className="px-3 py-3">{t("operatorCol")}</th>
+                <th className="px-3 py-3">{t("startTimeCol")}</th>
+                <th className="px-3 py-3">{t("endTimeCol")}</th>
+                <th className="px-3 py-3">{t("crossesMidnightCol")}</th>
+                <th className="px-3 py-3">{t("downtimeMinsCol")}</th>
+                <th className="px-3 py-3">{t("downtimeReasonCol")}</th>
+                <th className="px-3 py-3 text-right">{t("hoursWorkedCol")}</th>
                 <th className="px-3 py-3">Sched (h)</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3 text-right">Actions</th>
+                <th className="px-3 py-3">{t("status")}</th>
+                <th className="px-3 py-3 text-right">{t("actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1182,8 +1184,8 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                           }`}
                         >
                           {row.approvalStatus === "NEW"
-                            ? "Unsaved Row"
-                            : formatApprovalStatusLabel(row.approvalStatus)}
+                            ? (language === "si" ? "සුරැකි නැත" : "Unsaved Row")
+                            : formatApprovalStatusLabel(row.approvalStatus, language)}
                         </span>
                       </td>
                       <td className="px-2 py-2 text-right">
@@ -1196,7 +1198,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                                 onClick={() => void saveMachineRow(row, false)}
                                 className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold text-[#092547] hover:bg-slate-50"
                               >
-                                Save Draft
+                                {t("saveDraftBtn")}
                               </button>
                               <button
                                 type="button"
@@ -1204,7 +1206,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                                 onClick={() => void saveMachineRow(row, true)}
                                 className="rounded-lg bg-[#092547] px-2.5 py-1 font-bold text-white hover:bg-[#103462]"
                               >
-                                Submit
+                                {t("submit")}
                               </button>
                               <button
                                 type="button"
@@ -1219,7 +1221,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                                 }
                                 className="rounded-lg border border-rose-200 px-2 py-1 font-bold text-rose-700 hover:bg-rose-50"
                               >
-                                Cancel
+                                {t("cancel")}
                               </button>
                             </>
                           )}
@@ -1235,7 +1237,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                               }
                               className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
                             >
-                              History
+                              {t("viewHistoryBtn")}
                             </button>
                           )}
                         </div>
@@ -1259,15 +1261,15 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
           <table className="w-full min-w-[950px] border-collapse text-left text-xs">
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-3 py-3">Date</th>
-                <th className="px-3 py-3">Material</th>
-                <th className="px-3 py-3">Machine</th>
-                <th className="px-3 py-3">Operator</th>
-                <th className="px-3 py-3">Shift</th>
-                <th className="px-3 py-3">Quantity (m³)</th>
-                <th className="px-3 py-3">Remarks</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3 text-right">Actions</th>
+                <th className="px-3 py-3">{t("workDateCol")}</th>
+                <th className="px-3 py-3">{t("producedMaterialCol")}</th>
+                <th className="px-3 py-3">{t("machineCol")}</th>
+                <th className="px-3 py-3">{t("operatorCol")}</th>
+                <th className="px-3 py-3">{t("shiftCol")}</th>
+                <th className="px-3 py-3">{t("volumeM3Col")}</th>
+                <th className="px-3 py-3">{t("remarks")}</th>
+                <th className="px-3 py-3">{t("status")}</th>
+                <th className="px-3 py-3 text-right">{t("actions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1441,8 +1443,8 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                           }`}
                         >
                           {row.approvalStatus === "NEW"
-                            ? "Unsaved Row"
-                            : formatApprovalStatusLabel(row.approvalStatus)}
+                            ? (language === "si" ? "සුරැකි නැත" : "Unsaved Row")
+                            : formatApprovalStatusLabel(row.approvalStatus, language)}
                         </span>
                       </td>
                       <td className="px-2 py-2 text-right">
@@ -1455,7 +1457,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                                 onClick={() => void saveProductionRow(row, false)}
                                 className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 font-bold text-[#092547] hover:bg-slate-50"
                               >
-                                Save Draft
+                                {t("saveDraftBtn")}
                               </button>
                               <button
                                 type="button"
@@ -1463,7 +1465,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                                 onClick={() => void saveProductionRow(row, true)}
                                 className="rounded-lg bg-[#092547] px-2.5 py-1 font-bold text-white hover:bg-[#103462]"
                               >
-                                Submit
+                                {t("submit")}
                               </button>
                               <button
                                 type="button"
@@ -1478,7 +1480,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                                 }
                                 className="rounded-lg border border-rose-200 px-2 py-1 font-bold text-rose-700 hover:bg-rose-50"
                               >
-                                Cancel
+                                {t("cancel")}
                               </button>
                             </>
                           )}
@@ -1494,7 +1496,7 @@ export function DailyOperationsPage({ user }: DailyOperationsPageProps) {
                               }
                               className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
                             >
-                              History
+                              {t("viewHistoryBtn")}
                             </button>
                           )}
                         </div>

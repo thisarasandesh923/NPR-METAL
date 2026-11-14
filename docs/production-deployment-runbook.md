@@ -34,17 +34,102 @@ Verify via `psql` that:
 
 ---
 
-## 3. Secure Initial User & Material Catalog Bootstrap (CLI Only — Zero Hardcoded Secrets)
+## 3. Secure Initial User & Material Catalog Bootstrap (CLI Onboarding)
 Do **not** create accounts through public signup (there is none). On day-of-launch, the operator provisions:
 - **1 OWNER** account (`role = 'OWNER'`)
 - **2 CASHIER** accounts (`role = 'CASHIER'`)
-- Confirmed selling prices in `materials` (`3/4"`, `Dust`, `6×9`, `ABC`)
+- Confirmed initial selling prices in `materials` (`3/4"`, `Dust`, `6×9`, `ABC`)
 
-Use a temporary operator one-liner or interactive CLI script reading `ADMIN_PASSWORD` from a masked `Read-Host -AsSecureString` prompt and hashing with `backend/src/modules/auth/password.ts` (`scrypt`, 16-byte random salt, `N=16384`). Never store plaintext passwords in files, shell history, or git.
+Run the interactive onboarding script (zero hardcoded secrets):
+```powershell
+# In backend/ directory with MIGRATION_DATABASE_URL or DATABASE_URL set
+npm --prefix backend run onboard:users
+```
+
+The script interactively prompts for:
+1. Owner username & password (hashed via `scrypt`, 16-byte random salt, `N=16384`).
+2. Cashier 1 username & password.
+3. Cashier 2 username & password.
+4. Unit prices (LKR per m³) for:
+   - `3/4"` (e.g. `Rs. 8,500.00`)
+   - `Dust` (e.g. `Rs. 4,200.00`)
+   - `6×9` (e.g. `Rs. 7,800.00`)
+   - `ABC` (e.g. `Rs. 6,500.00`)
+
+Never store plaintext passwords in files, shell history, or git.
 
 ---
 
-## 4. Production Backend Environment & Reverse Proxy Checklist
+## 4. Disaster Recovery & Database Backup Rehearsal
+
+### 4.1 Automated Offline Backup (`pg_dump`)
+Run the backup script before any release or on a daily automated schedule (e.g., via Task Scheduler or cron):
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/database/backup-supabase.ps1 `
+  -BackupDir "D:\NPR_Backups" `
+  -RetentionDays 30
+```
+This generates a timestamped, compressed custom-format dump (`npr_metal_crusher_YYYYMMDD_HHMMSS.dump`) using `pg_dump -Fc`.
+
+### 4.2 Disaster Recovery Rehearsal (`pg_restore`)
+Regularly verify that the database can be fully recovered onto a clean staging/local database without touching production:
+```powershell
+# Restore into an isolated local/staging database
+powershell -ExecutionPolicy Bypass -File scripts/database/restore-rehearsal.ps1 `
+  -TargetDatabaseUrl "postgresql://postgres:password@localhost:5432/npr_recovery_test?sslmode=disable" `
+  -BackupFile "D:\NPR_Backups\npr_metal_crusher_YYYYMMDD_HHMMSS.dump"
+```
+The script validates:
+- Schema restore and clean exit.
+- Table existence across all 24 core tables (`users`, `user_sessions`, `materials`, `customers`, `invoices`, `invoice_items`, `payments`, `workers`, `daily_attendance`, `salary_advances`, `payroll_periods`, `worker_payslips`, `machine_working_logs`, `production_logs`, etc.).
+- Financial trigger integrity.
+
+---
+
+## 5. Low-Cost Production Hosting Architecture ($5 – $12 / Month)
+
+For a real-world Sri Lankan metal crusher workshop, the application must run with high uptime, low network latency, robust TLS security, and minimal monthly infrastructure cost.
+
+### Option A: Managed PaaS + Managed DB (Recommended)
+- **Frontend & Backend API:** Render Web Service or Railway ($5 – $7 / mo).
+  - Single Node.js 24 runtime serving Express API (`/api/*`) and static Vite bundle (`frontend/dist`) on the same origin.
+  - Zero cross-origin cookie or CORS complexity.
+- **Database:** Supabase PostgreSQL in Mumbai (`ap-south-1`) — ~30–45 ms ping from Sri Lanka.
+  - Free Tier ($0/mo) for initial months (up to 500 MB database, plenty for hundreds of thousands of invoices).
+  - Scheduled daily offline backups via `scripts/database/backup-supabase.ps1`.
+- **DNS & CDN:** Cloudflare Free Tier ($0/mo) with full Edge TLS (HTTPS), HTTP/3, and DDoS protection.
+- **Estimated Total Cost:** **$5 – $7 / month**.
+
+### Option B: Self-Hosted Cloud VPS (Maximum Control & Cost Savings)
+- **Cloud Provider:** DigitalOcean Droplet (Singapore `sgp1`, ~35 ms latency to Colombo) or Hetzner Cloud (CX22 / CPX11).
+  - 2 GB RAM, 1–2 vCPUs, 25–40 GB NVMe SSD: **$4 – $6 / month**.
+- **Web Server / Reverse Proxy:** Caddy v2.
+  - Automatic Let's Encrypt SSL/TLS certificates.
+  - Built-in compression (gzip / zstd).
+  - Reverse proxies `/api/*` to Express on `127.0.0.1:4000` and serves `frontend/dist` directly.
+- **Process Manager:** PM2 (`pm2 start dist/server.js --name npr-api`) or Docker Compose.
+- **Estimated Total Cost:** **$4 – $6 / month**.
+
+---
+
+## 6. Workshop Cashier & Owner Device Setup
+
+### 6.1 Cashier Workstation (Desktop / POS)
+- **Language Default:** Defaults automatically to **Sinhala (`si`)** (`"මුදල් අයකැමි පුවරුව"`). A top-header pill button (`🇱🇰 සිංහල / 🇬🇧 English`) allows instant switching.
+- **Material Codes & Invoices:** Key aggregate codes (`3/4"`, `Dust`, `6×9`, `ABC`), Invoice IDs (`INV-YYYY-XXXX`), and currency symbols (`Rs.`) remain in standard Latin characters for compatibility with barcode readers and standard POS thermal/A5 slips.
+- **A5 Invoice Printing:**
+  - Cashiers click **"Print A5 Slip" / "A5 රිසිට්පත මුද්‍රණය"**.
+  - Browser print dialog opens pre-configured for A5 landscape/portrait with custom `@media print` CSS hiding navigation sidebars, buttons, and status bars.
+
+### 6.2 Owner Mobile & Remote Access
+- Owner can access the management dashboard via any modern smartphone browser (Chrome / Safari).
+- Full mobile-responsive UI with collapsible navigation, quick approval action buttons, daily business summary KPI cards, and CSV/Excel exports.
+- Multi-factor session security: Session cookie is `HttpOnly`, `SameSite=Lax`, and `Secure`.
+- LAN Dev access: During on-site network setup or local staging, RFC 1918 private IPs (`192.168.8.x`, `10.x.x.x`, `172.16-31.x.x`) are automatically permitted by the development CORS configuration.
+
+---
+
+## 7. Production Backend Environment & Reverse Proxy Checklist
 1. **`NODE_ENV=production`**
 2. **`DATABASE_URL`**: Must use `npr_app_user` (never `postgres`), Session Pooler port `5432`, `sslmode=verify-full`, `sslrootcert` pointing to the verified Supabase CA certificate.
 3. **`MIGRATION_DATABASE_URL`**: Removed or left unset on public web runtime containers (only used by operator deployment job).
@@ -56,7 +141,7 @@ Use a temporary operator one-liner or interactive CLI script reading `ADMIN_PASS
 
 ---
 
-## 5. Production Smoke-Test Checklist (Post-Launch)
+## 8. Production Smoke-Test Checklist (Post-Launch)
 1. `GET /api/health` returns `200 OK` without leaking DB URLs or versions.
 2. Unauthenticated `GET /api/auth/me` returns `401`; `GET /api/payroll/periods` returns `401`.
 3. Sign in as **Cashier 1**:
@@ -70,11 +155,10 @@ Use a temporary operator one-liner or interactive CLI script reading `ADMIN_PASS
 
 ---
 
-## 6. Open Workshop Policies Pending Client Decision
+## 9. Open Workshop Policies Pending Client Decision
 Before altering default formulas in production, confirm these workshop rules with the NPR Owner:
 1. Overtime rate multipliers (hourly OT vs custom flat bonus rates per role).
 2. Monthly salaried worker deduction / proration formula for unpaid leave days.
 3. Fixed scheduled working hours per machine (used for utilization `%` when entered; left uncomputed `"Not Scheduled"` until defined).
 4. Physical stockpile inventory deduction model (`production_logs m³` vs `invoice_items m³`).
 5. Customer **`CASH_REFUND`** & full **Invoice Cancellation (`Credit Note`)** policy (`ENTRY_REVERSAL` for clerical mistakes is enabled and active; cash-out refunds await Owner confirmation).
-

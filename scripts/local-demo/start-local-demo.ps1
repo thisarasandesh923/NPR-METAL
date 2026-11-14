@@ -23,7 +23,7 @@ try {
 
   $ready = $false
   for ($i = 0; $i -lt 30; $i++) {
-    docker exec npr-local-demo-pg psql -U postgres -d npr_test_db -c "SELECT 1" *> $null
+    docker exec npr-local-demo-pg pg_isready -U postgres -d npr_test_db *> $null
     if ($LASTEXITCODE -eq 0) { $ready = $true; break }
     Start-Sleep -Seconds 1
   }

@@ -11,15 +11,15 @@ interface InvoicePrintA5Props {
 function formatPaymentStatusLabel(status: InvoiceDetail["paymentStatus"]): string {
   switch (status) {
     case "PAID":
-      return "PAID";
+      return "PAID / සම්පූර්ණයෙන් ගෙවා ඇත";
     case "PARTIALLY_PAID":
-      return "PARTIALLY PAID";
+      return "PARTIALLY PAID / කොටසක් ගෙවා ඇත";
     case "UNPAID":
-      return "UNPAID";
+      return "UNPAID / නොගෙවූ (ණය)";
     case "CANCELLED":
-      return "CANCELLED";
+      return "CANCELLED / අවලංගුයි";
     case "REFUND_DUE":
-      return "REFUND DUE";
+      return "REFUND DUE / මුදල් ආපසු ගෙවිය යුතුයි";
   }
 }
 
@@ -35,13 +35,16 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
             <h1 className="text-lg font-extrabold tracking-wide text-[#092547]">
               NPR METAL CRUSHER
             </h1>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
-              Crushed Stone &amp; Quarry Aggregates · Kurunegala, Sri Lanka
+            <p className="text-[10px] font-semibold text-slate-700">
+              එන්.පී.ආර්. මෙටල් ක්‍රෂර් · Kurunegala, Sri Lanka
+            </p>
+            <p className="text-[9px] uppercase tracking-[0.08em] text-slate-500">
+              Aggregates: 3/4&quot;, Dust, 6×9, ABC · Crushed Metal Quarry
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500">
-              Cash / Credit Invoice
+            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">
+              Invoice / බිල්පත
             </p>
             <p className="text-sm font-extrabold text-[#092547]">
               {invoice.invoiceNumber}
@@ -52,32 +55,32 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
         <div className="mt-3 grid grid-cols-2 gap-3 border-b border-slate-200 pb-3">
           <div>
             <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
-              Bill To Customer
+              Customer / පාරිභෝගිකයා
             </p>
             <p className="mt-0.5 text-xs font-extrabold text-[#092547]">
               {invoice.customerName}
             </p>
             <p className="text-[10px] text-slate-700">
-              Tel: {invoice.customerPhone}
+              Tel / දුරකථනය: {invoice.customerPhone}
             </p>
             <p className="text-[10px] text-slate-700">
-              Location: {invoice.customerLocation}
+              Site / ස්ථානය: {invoice.customerLocation}
             </p>
           </div>
           <div className="text-right">
             <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
-              Issue Details
+              Issue Details / විස්තර
             </p>
             <p className="mt-0.5 text-[10px] text-slate-700">
-              Issued: <strong>{formatColomboDateTime(invoice.issuedAt)}</strong>
+              Date / දිනය: <strong>{formatColomboDateTime(invoice.issuedAt)}</strong>
             </p>
             <p className="text-[10px] text-slate-700">
-              Cashier: <strong>{invoice.issuedByName}</strong>
+              Cashier / අයකැමි: <strong>{invoice.issuedByName}</strong>
             </p>
             <p className="text-[10px] text-slate-700">
-              Transport:{" "}
+              Transport / ප්‍රවාහනය:{" "}
               <strong>
-                {invoice.hasTransport ? "With Transport" : "Customer Pickup"}
+                {invoice.hasTransport ? "With Transport (සහිතයි)" : "Customer Pickup (රහිතයි)"}
               </strong>
             </p>
           </div>
@@ -87,10 +90,10 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
           <thead>
             <tr className="border-b border-slate-400 bg-slate-100 text-left">
               <th className="px-2 py-1.5 font-bold">#</th>
-              <th className="px-2 py-1.5 font-bold">Material</th>
-              <th className="px-2 py-1.5 text-right font-bold">Qty (m³)</th>
-              <th className="px-2 py-1.5 text-right font-bold">Unit Price</th>
-              <th className="px-2 py-1.5 text-right font-bold">Total (LKR)</th>
+              <th className="px-2 py-1.5 font-bold">Material / ද්‍රව්‍යය</th>
+              <th className="px-2 py-1.5 text-right font-bold">Qty / ප්‍රමාණය (m³)</th>
+              <th className="px-2 py-1.5 text-right font-bold">Unit Price / ඒකක මිල</th>
+              <th className="px-2 py-1.5 text-right font-bold">Total / මුළු මුදල</th>
             </tr>
           </thead>
           <tbody>
@@ -98,7 +101,7 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
               <tr key={item.id} className="border-b border-slate-200">
                 <td className="px-2 py-1.5">{idx + 1}</td>
                 <td className="px-2 py-1.5 font-bold">{item.materialName}</td>
-                <td className="px-2 py-1.5 text-right">{item.quantity}</td>
+                <td className="px-2 py-1.5 text-right">{item.quantity} m³</td>
                 <td className="px-2 py-1.5 text-right">
                   {formatLkr(item.unitPrice)}
                 </td>
@@ -113,11 +116,11 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
         <div className="mt-3 flex justify-between gap-4 border-b border-slate-200 pb-3">
           <div className="w-1/2">
             <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
-              Payment Receipts ({invoice.payments.length})
+              Payment Receipts / ගෙවීම් රිසිට්පත් ({invoice.payments.length})
             </p>
             {invoice.payments.length === 0 ? (
               <p className="mt-1 text-[10px] text-slate-600">
-                No cash payments recorded yet.
+                No cash payments recorded yet (ණය බිල්පතකි).
               </p>
             ) : (
               <ul className="mt-1 space-y-0.5 text-[10px] text-slate-700">
@@ -133,26 +136,26 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
 
           <div className="w-1/2 space-y-1 text-right text-[10px]">
             <div className="flex justify-between">
-              <span className="text-slate-600">Subtotal:</span>
+              <span className="text-slate-600">Subtotal / ද්‍රව්‍ය එකතුව:</span>
               <strong>{formatLkr(invoice.subtotal)}</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-600">Transport Fee:</span>
+              <span className="text-slate-600">Transport / ප්‍රවාහන ගාස්තුව:</span>
               <strong>{formatLkr(invoice.transportFee)}</strong>
             </div>
             <div className="flex justify-between border-t border-slate-300 pt-1 text-xs">
-              <span className="font-extrabold">Grand Total:</span>
-              <strong>{formatLkr(invoice.grandTotal)}</strong>
+              <span className="font-extrabold">Grand Total / මුළු මුදල:</span>
+              <strong className="text-[#092547]">{formatLkr(invoice.grandTotal)}</strong>
             </div>
             <div className="flex justify-between text-emerald-800">
-              <span>Amount Paid:</span>
+              <span>Amount Paid / ගෙවූ මුදල:</span>
               <strong>{formatLkr(invoice.paidAmount)}</strong>
             </div>
             <div className="flex justify-between border-t border-slate-300 pt-1 text-xs">
-              <span className="font-extrabold">Outstanding Balance:</span>
-              <strong>{formatLkr(invoice.balanceDue)}</strong>
+              <span className="font-extrabold">Balance Due / ඉතිරි මුදල:</span>
+              <strong className="text-[#e77418]">{formatLkr(invoice.balanceDue)}</strong>
             </div>
-            <p className="pt-0.5 text-[9px] font-extrabold uppercase tracking-[0.08em]">
+            <p className="pt-0.5 text-[9px] font-extrabold uppercase tracking-[0.08em] text-slate-600">
               Status: {formatPaymentStatusLabel(invoice.paymentStatus)}
             </p>
           </div>
@@ -160,15 +163,17 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
 
         <footer className="mt-4 pt-2">
           <p className="text-[9px] text-slate-500">
-            Official computer-generated invoice. Commercial line items and prices
-            are permanently locked upon issuance.
+            Official computer-generated invoice. Commercial terms and prices are permanently locked upon issuance.
+            නිල පරිගණක මුද්‍රිත බිල්පතකි. ස්තූතියි!
           </p>
           <div className="mt-6 grid grid-cols-2 gap-8 text-center text-[10px]">
             <div className="border-t border-slate-400 pt-1">
-              Customer / Receiver Signature
+              Customer / Receiver Signature<br />
+              <span className="text-[9px] text-slate-500">පාරිභෝගික / භාරගන්නාගේ අත්සන</span>
             </div>
             <div className="border-t border-slate-400 pt-1">
-              Authorized Cashier ({invoice.issuedByName})
+              Authorized Cashier ({invoice.issuedByName})<br />
+              <span className="text-[9px] text-slate-500">බලයලත් මුදල් අයකැමි අත්සන</span>
             </div>
           </div>
         </footer>

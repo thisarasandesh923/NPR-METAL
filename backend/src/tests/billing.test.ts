@@ -455,3 +455,4 @@ describe("Billing MVP — Real PostgreSQL 17 + npr_app_user Integration Tests", 
     assert.equal(overview.totalOutstandingBalance, "27063.06");
   });
 });
+
