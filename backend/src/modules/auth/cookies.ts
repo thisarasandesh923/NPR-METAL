@@ -51,7 +51,7 @@ export function formatSessionCookie(
     `${SESSION_COOKIE_NAME}=${encodeURIComponent(rawToken)}`,
     "Path=/",
     "HttpOnly",
-    "SameSite=Lax",
+    secure ? "SameSite=None" : "SameSite=Lax",
     `Max-Age=${maxAgeSeconds}`,
     `Expires=${expiresAt.toUTCString()}`,
   ];
