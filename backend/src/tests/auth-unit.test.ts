@@ -19,6 +19,7 @@ import {
 } from "../modules/auth/password.js";
 import { AuthService } from "../modules/auth/auth.service.js";
 import { UnauthorizedError } from "../errors/appError.js";
+import { errorHandler } from "../middleware/error.middleware.js";
 import type { NextFunction, Request, Response } from "express";
 
 describe("Phase 3A — Auth Unit Tests (Hashing, Cookies, SecurityConfig & RBAC)", () => {
@@ -446,6 +447,61 @@ describe("Phase 3A — Auth Unit Tests (Hashing, Cookies, SecurityConfig & RBAC)
       assert.ok(capturedError instanceof UnauthorizedError);
       assert.equal(capturedError.code, "INVALID_CREDENTIALS");
       assert.equal(sessionsCreated.length, 0);
+    }
+  });
+
+  it("errorHandler outputs safe diagnostic metadata (SQLSTATE, code, sanitized message) without leaking credentials", () => {
+    const errorLogs: string[] = [];
+    const origConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      errorLogs.push(args.join(" "));
+    };
+
+    try {
+      // 1. DatabaseError with SQLSTATE and routine
+      const dbErr = Object.assign(new Error("permission denied for table users"), {
+        name: "error",
+        code: "42501",
+        severity: "ERROR",
+        routine: "aclcheck_error",
+      });
+
+      let responseStatus = 0;
+      let responsePayload: any = null;
+      const mockRes = {
+        status(s: number) {
+          responseStatus = s;
+          return this;
+        },
+        json(p: any) {
+          responsePayload = p;
+        },
+        setHeader() {},
+      } as unknown as Response;
+
+      errorHandler(dbErr, {} as Request, mockRes, (() => {}) as NextFunction);
+      assert.equal(responseStatus, 500);
+      assert.equal(responsePayload.error.code, "INTERNAL_ERROR");
+
+      const logged = errorLogs[errorLogs.length - 1];
+      assert.ok(logged.includes("[ERROR] Unhandled server error"));
+      assert.ok(logged.includes("name=error"));
+      assert.ok(logged.includes("code=42501"));
+      assert.ok(logged.includes("severity=ERROR"));
+      assert.ok(logged.includes("routine=aclcheck_error"));
+      assert.ok(logged.includes("permission denied for table users"));
+
+      // 2. Connection error with embedded credential in URL -> must be sanitized
+      const connErr = new Error("Failed connecting to postgresql://npr_user:SuperSecretPassword123@db.supabase.co:5432/postgres");
+      (connErr as any).code = "SELF_SIGNED_CERT_IN_CHAIN";
+
+      errorHandler(connErr, {} as Request, mockRes, (() => {}) as NextFunction);
+      const sanitizedLog = errorLogs[errorLogs.length - 1];
+      assert.ok(sanitizedLog.includes("code=SELF_SIGNED_CERT_IN_CHAIN"));
+      assert.ok(sanitizedLog.includes("postgresql://npr_user:***@db.supabase.co:5432/postgres"));
+      assert.equal(sanitizedLog.includes("SuperSecretPassword123"), false);
+    } finally {
+      console.error = origConsoleError;
     }
   });
 });

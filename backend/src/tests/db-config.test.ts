@@ -1,11 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
+  BUNDLED_CA_CERT_PATH,
   getMigrationDatabaseUrl,
   getRuntimeDatabaseUrl,
   isPrivilegedMigrationRoleUsername,
   isRestrictedRuntimeRoleUrl,
   isRestrictedRuntimeRoleUsername,
+  resolvePoolDatabaseUrl,
 } from "../db/config.js";
 
 describe("Phase 2C — Backend Database Connection Separation & Safety Guards", () => {
@@ -197,5 +200,40 @@ describe("Phase 2C — Backend Database Connection Separation & Safety Guards", 
       getMigrationDatabaseUrl({ MIGRATION_DATABASE_URL: localDockerUrl }),
       localDockerUrl
     );
+  });
+
+  it("resolvePoolDatabaseUrl auto-resolves bundled Supabase Root CA when sslrootcert is missing or points to invalid OS paths", () => {
+    assert.equal(fs.existsSync(BUNDLED_CA_CERT_PATH), true);
+
+    // 1. Remote verify-full URL without sslrootcert -> injects bundled CA
+    const remoteNoCert =
+      "postgresql://npr_app_user.ref:pwd@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=verify-full";
+    const resolvedNoCert = resolvePoolDatabaseUrl(remoteNoCert);
+    const parsedNoCert = new URL(resolvedNoCert);
+    assert.equal(parsedNoCert.searchParams.get("sslrootcert"), BUNDLED_CA_CERT_PATH);
+
+    // 2. Remote verify-full URL with non-existent Windows path (e.g. running in Linux Render container) -> recovers with bundled CA
+    const remoteInvalidPath =
+      "postgresql://npr_app_user.ref:pwd@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=C:/NonExistent/prod-ca-2021.crt";
+    const resolvedInvalid = resolvePoolDatabaseUrl(remoteInvalidPath);
+    const parsedInvalid = new URL(resolvedInvalid);
+    assert.equal(parsedInvalid.searchParams.get("sslrootcert"), BUNDLED_CA_CERT_PATH);
+
+    // 3. Remote verify-full URL with an already valid, existing cert path -> preserves it
+    const remoteExistingCert = `postgresql://npr_app_user.ref:pwd@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=verify-full&sslrootcert=${encodeURIComponent(
+      BUNDLED_CA_CERT_PATH
+    )}`;
+    const resolvedExisting = resolvePoolDatabaseUrl(remoteExistingCert);
+    const parsedExisting = new URL(resolvedExisting);
+    assert.equal(parsedExisting.searchParams.get("sslrootcert"), BUNDLED_CA_CERT_PATH);
+
+    // 4. Local URL -> untouched
+    const localUrl = "postgresql://npr_app_user:pwd@127.0.0.1:5432/postgres";
+    assert.equal(resolvePoolDatabaseUrl(localUrl), localUrl);
+
+    // 5. Remote non-verify-full URL -> untouched
+    const remoteNonVerify =
+      "postgresql://npr_app_user.ref:pwd@aws-0-ap-south-1.pooler.supabase.com:5432/postgres";
+    assert.equal(resolvePoolDatabaseUrl(remoteNonVerify), remoteNonVerify);
   });
 });

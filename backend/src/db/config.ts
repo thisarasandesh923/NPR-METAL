@@ -1,3 +1,11 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+export const BUNDLED_CA_CERT_PATH = path.resolve(__dirname, "../../certs/prod-ca-2021.crt");
+
 const LOCAL_TEST_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const INSECURE_REMOTE_SSL_MODES = new Set([
   "disable",
@@ -135,6 +143,44 @@ export function parseAndValidateDatabaseUrl(
   }
 
   return parsed;
+}
+
+/**
+ * Prepares a database URL for use by pg.Pool.
+ * If the connection is remote and enforces sslmode=verify-full:
+ * - Checks if the specified sslrootcert exists on disk.
+ * - If missing or pointing to a non-existent path (such as Windows paths in Linux containers),
+ *   automatically resolves to the bundled Supabase Root CA (certs/prod-ca-2021.crt).
+ */
+export function resolvePoolDatabaseUrl(rawUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return rawUrl;
+  }
+
+  const effectiveHost = getEffectiveHostname(parsed);
+  if (isLocalHostname(effectiveHost)) {
+    return rawUrl;
+  }
+
+  const sslMode = parsed.searchParams.get("sslmode")?.trim().toLowerCase();
+  if (sslMode !== "verify-full") {
+    return rawUrl;
+  }
+
+  const existingCertPath = parsed.searchParams.get("sslrootcert")?.trim();
+  if (existingCertPath && fs.existsSync(existingCertPath)) {
+    return parsed.toString();
+  }
+
+  if (fs.existsSync(BUNDLED_CA_CERT_PATH)) {
+    parsed.searchParams.set("sslrootcert", BUNDLED_CA_CERT_PATH);
+    return parsed.toString();
+  }
+
+  return rawUrl;
 }
 
 /**

@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import type { SecurityConfig } from "../../config/securityConfig.js";
-import { TooManyRequestsError, UnauthorizedError } from "../../errors/appError.js";
+import {
+  AppError,
+  TooManyRequestsError,
+  UnauthorizedError,
+} from "../../errors/appError.js";
 import {
   acquireLoginThrottleLocks,
   createSession,
@@ -74,14 +78,32 @@ export class AuthService {
     const ipAddress = normalizeIpAddress(input.ipAddress);
     const userAgent = normalizeUserAgent(input.userAgent);
 
-    const client = await this.pool.connect();
+    let currentStage = "DB_CONNECT";
+    let client: import("pg").PoolClient;
+    try {
+      client = await this.pool.connect();
+    } catch (connectErr) {
+      const errObj = connectErr instanceof Object ? (connectErr as Record<string, unknown>) : {};
+      const code = typeof errObj.code === "string" || typeof errObj.code === "number" ? String(errObj.code) : "UNKNOWN";
+      const name = connectErr instanceof Error ? connectErr.name : "Error";
+      let msg = connectErr instanceof Error ? connectErr.message : String(connectErr);
+      msg = msg.replace(/:\/\/([^:]+):([^@]+)@/g, "://$1:***@");
+      console.error(
+        `[AUTH_LOGIN_ERROR] stage=DB_CONNECT code=${code} name=${name} message=${msg}`
+      );
+      throw connectErr;
+    }
+
     let inTransaction = false;
     try {
+      currentStage = "DB_BEGIN";
       await client.query("BEGIN");
       inTransaction = true;
 
+      currentStage = "THROTTLE_LOCKS";
       await acquireLoginThrottleLocks(client, userEntityId, ipAddress);
 
+      currentStage = "THROTTLE_STATE";
       const throttle = await getLoginThrottleState(client, {
         userEntityId,
         ipAddress,
@@ -112,9 +134,11 @@ export class AuthService {
         throw new TooManyRequestsError(Math.max(1, Math.ceil(retryAfterMs / 1000)));
       }
 
+      currentStage = "FIND_USER";
       const userRow = await findUserForLogin(client, normalizedUsername);
 
       if (!userRow || !userRow.is_active) {
+        currentStage = "AUDIT_FAILURE_INACTIVE_OR_UNKNOWN";
         await verifyAgainstDummyPassword(input.password);
         await insertAuthAuditLog(client, {
           userId: null,
@@ -134,12 +158,14 @@ export class AuthService {
         );
       }
 
+      currentStage = "VERIFY_PASSWORD";
       const passwordValid = await verifyPassword(
         input.password,
         userRow.password_hash
       );
 
       if (!passwordValid || !isValidUserRole(userRow.role)) {
+        currentStage = "AUDIT_FAILURE_INVALID_PASSWORD";
         await insertAuthAuditLog(client, {
           userId: userRow.id,
           action: "LOGIN_FAILED",
@@ -160,6 +186,7 @@ export class AuthService {
 
       // Cross-role login protection: enforce portal selection against the user's authoritative server-stored role
       if (input.portal && userRow.role !== input.portal) {
+        currentStage = "AUDIT_FAILURE_CROSS_ROLE_MISMATCH";
         await insertAuthAuditLog(client, {
           userId: userRow.id,
           action: "LOGIN_FAILED",
@@ -182,6 +209,7 @@ export class AuthService {
         );
       }
 
+      currentStage = "SESSION_CLEANUP";
       // Session fixation defense & opportunistic expired session cleanup for this account
       if (input.existingSessionToken) {
         const oldHash = hashSessionToken(input.existingSessionToken);
@@ -189,6 +217,7 @@ export class AuthService {
       }
       await purgeExpiredUserSessions(client, userRow.id);
 
+      currentStage = "CREATE_SESSION";
       const rawToken = generateSessionToken();
       const tokenHash = hashSessionToken(rawToken);
       const requestedExpiresAt = new Date(
@@ -203,6 +232,7 @@ export class AuthService {
         expiresAt: requestedExpiresAt,
       });
 
+      currentStage = "AUDIT_SUCCESS";
       await insertAuthAuditLog(client, {
         userId: userRow.id,
         action: "LOGIN_SUCCEEDED",
@@ -215,6 +245,7 @@ export class AuthService {
         ipAddress,
       });
 
+      currentStage = "DB_COMMIT";
       await client.query("COMMIT");
       inTransaction = false;
 
@@ -231,6 +262,19 @@ export class AuthService {
     } catch (err) {
       if (inTransaction) {
         await client.query("ROLLBACK").catch(() => {});
+      }
+      if (!(err instanceof AppError)) {
+        const errObj = err instanceof Object ? (err as Record<string, unknown>) : {};
+        const code =
+          typeof errObj.code === "string" || typeof errObj.code === "number"
+            ? String(errObj.code)
+            : "UNKNOWN";
+        const name = err instanceof Error ? err.name : "UnknownError";
+        let msg = err instanceof Error ? err.message : String(err);
+        msg = msg.replace(/:\/\/([^:]+):([^@]+)@/g, "://$1:***@");
+        console.error(
+          `[AUTH_LOGIN_ERROR] stage=${currentStage} code=${code} name=${name} message=${msg}`
+        );
       }
       throw err;
     } finally {

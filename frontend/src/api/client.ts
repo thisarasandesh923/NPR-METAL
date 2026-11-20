@@ -1,4 +1,8 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
+const rawBaseUrl =
+  typeof import.meta !== "undefined" && import.meta.env
+    ? (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ""
+    : "";
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export class ApiError extends Error {

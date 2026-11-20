@@ -53,9 +53,33 @@ export function errorHandler(
     return;
   }
 
-  // Log only safe metadata without dumping request bodies, headers, cookies, or SQL params
+  // Log safe error metadata (code, SQLSTATE, routine, name, sanitized message) without exposing passwords, tokens or parameters
+  const errObj = err instanceof Object ? (err as Record<string, unknown>) : {};
   const errorName = err instanceof Error ? err.name : "UnknownError";
-  console.error(`[ERROR] Unhandled server error (${errorName})`);
+  const errorCode =
+    typeof errObj.code === "string" || typeof errObj.code === "number"
+      ? String(errObj.code)
+      : undefined;
+  const routine = typeof errObj.routine === "string" ? errObj.routine : undefined;
+  const severity = typeof errObj.severity === "string" ? errObj.severity : undefined;
+
+  let safeMessage = err instanceof Error ? err.message : String(err);
+  safeMessage = safeMessage.replace(/:\/\/([^:]+):([^@]+)@/g, "://$1:***@");
+
+  const metaParts = [`name=${errorName}`];
+  if (errorCode) {
+    metaParts.push(`code=${errorCode}`);
+  }
+  if (severity) {
+    metaParts.push(`severity=${severity}`);
+  }
+  if (routine) {
+    metaParts.push(`routine=${routine}`);
+  }
+
+  console.error(
+    `[ERROR] Unhandled server error (${metaParts.join(" ")}) — ${safeMessage}`
+  );
 
   res.status(500).json({
     success: false,
