@@ -10,9 +10,12 @@ import type {
   RecordPaymentRequest,
 } from "../types/billing.ts";
 
-export async function fetchMaterials(): Promise<MaterialCatalogItem[]> {
+export async function fetchMaterials(
+  includeInactive = false
+): Promise<MaterialCatalogItem[]> {
+  const qs = includeInactive ? "?includeInactive=true" : "";
   const data = await apiRequest<{ materials: MaterialCatalogItem[] }>(
-    "/api/materials",
+    `/api/materials${qs}`,
     { method: "GET" }
   );
   return data.materials;

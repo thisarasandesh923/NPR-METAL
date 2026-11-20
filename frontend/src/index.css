@@ -254,10 +254,15 @@
 }
 
 .locked-price {
-  cursor: not-allowed;
-  border-color: #e8edf3;
-  background: #f4f7fa;
-  color: #64748b;
+  cursor: default;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #092547;
+}
+
+.locked-price:focus-within {
+  border-color: #cbd5e1;
+  box-shadow: none;
 }
 
 .invoice-items-table td {
@@ -372,7 +377,9 @@
   }
 }
 
-.print-only-sheet {
+.print-only-sheet,
+.print-a5-sheet,
+.print-thermal-sheet {
   display: none;
 }
 
@@ -394,14 +401,46 @@
     display: none !important;
   }
 
-  .print-only-sheet {
+  main {
+    margin-left: 0 !important;
+  }
+
+  /* Default / A5 invoice print layout */
+  body:not([data-print-format="thermal80"]) .print-a5-sheet {
     display: block !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  main {
-    margin-left: 0 !important;
+  body:not([data-print-format="thermal80"]) .print-thermal-sheet {
+    display: none !important;
+  }
+
+  /* 80mm POS Thermal receipt print layout */
+  body[data-print-format="thermal80"] {
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  body[data-print-format="thermal80"] .print-thermal-sheet {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body[data-print-format="thermal80"] .print-a5-sheet {
+    display: none !important;
+  }
+
+  .thermal-receipt-container {
+    width: 72mm !important;
+    max-width: 72mm !important;
+    margin: 0 auto !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }

@@ -1,9 +1,10 @@
 import { ApiError, apiRequest } from "./client.ts";
-import { isValidAuthUser, type AuthUser } from "../types/auth.ts";
+import { isValidAuthUser, type AuthUser, type UserRole } from "../types/auth.ts";
 
 export interface LoginCredentials {
   username: string;
   password: string;
+  portal?: UserRole;
 }
 
 interface AuthUserPayload {
@@ -33,6 +34,7 @@ export async function loginRequest(
     body: {
       username: credentials.username,
       password: credentials.password,
+      portal: credentials.portal,
     },
     skipUnauthorizedHandler: true,
   });

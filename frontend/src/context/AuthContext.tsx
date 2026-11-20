@@ -15,6 +15,7 @@ import {
   type LoginCredentials,
 } from "../api/auth.ts";
 import { ApiError, setUnauthorizedHandler } from "../api/client.ts";
+import { clearSavedNavigation } from "../features/auth/authNavigation.ts";
 import type { AuthStatus, AuthUser } from "../types/auth.ts";
 
 export interface AuthContextValue {
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleUnauthorizedExpiry = useCallback(() => {
     authVersionRef.current += 1;
+    clearSavedNavigation();
     setUser(null);
     setStatus("unauthenticated");
     setLogoutError(null);
@@ -148,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const authenticatedUser = await loginRequest(credentials);
     authVersionRef.current += 1;
     lastFocusCheckRef.current = Date.now();
+    clearSavedNavigation();
     if (mountedRef.current) {
       setUser(authenticatedUser);
       setStatus("authenticated");
@@ -163,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setIsLoggingOut(true);
     setLogoutError(null);
+    clearSavedNavigation();
     try {
       await logoutRequest();
       authVersionRef.current += 1;

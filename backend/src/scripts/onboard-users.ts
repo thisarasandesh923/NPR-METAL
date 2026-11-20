@@ -1,5 +1,7 @@
+import "dotenv/config";
 import readline from "node:readline/promises";
 import pg from "pg";
+import { getMigrationDatabaseUrl } from "../db/config.js";
 import { hashPassword } from "../modules/auth/password.js";
 
 const { Client } = pg;
@@ -19,10 +21,10 @@ interface MaterialInitialPrice {
 }
 
 const DEFAULT_MATERIALS: MaterialInitialPrice[] = [
-  { code: "3/4", name: '3/4" Crushed Metal', unit: "m³", price: "12000.00" },
-  { code: "DUST", name: "Quarry Dust", unit: "m³", price: "8500.00" },
-  { code: "6X9", name: '6×9" Rubble / Aggregates', unit: "m³", price: "10500.00" },
-  { code: "ABC", name: "Aggregate Base Coarse (ABC)", unit: "m³", price: "9500.00" },
+  { code: "3/4", name: "3/4 Metal", unit: "m³", price: "12000.00" },
+  { code: "DUST", name: "Dust", unit: "m³", price: "8500.00" },
+  { code: "6X9", name: "6×9 (Aggregate)", unit: "m³", price: "10500.00" },
+  { code: "ABC", name: "ABC", unit: "m³", price: "9500.00" },
 ];
 
 async function promptMasked(rl: readline.Interface, promptText: string): Promise<string> {
@@ -31,14 +33,10 @@ async function promptMasked(rl: readline.Interface, promptText: string): Promise
 }
 
 async function main(): Promise<void> {
-  const dbUrl = process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL;
-  if (!dbUrl) {
-    throw new Error("MIGRATION_DATABASE_URL or DATABASE_URL is required to onboard users.");
-  }
+  const dbUrl = getMigrationDatabaseUrl();
 
   const client = new Client({
     connectionString: dbUrl,
-    ssl: dbUrl.includes("supabase") ? { rejectUnauthorized: false } : false,
   });
 
   await client.connect();
@@ -184,3 +182,4 @@ async function main(): Promise<void> {
 }
 
 void main();
+

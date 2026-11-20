@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useAuth } from "../../../context/AuthContext.tsx";
 import type { UserRole } from "../../../types/auth.ts";
 import { Icon } from "../../../components/ui/Icon.tsx";
-import { LoginPage } from "./LoginPage.tsx";
+import { LandingPage } from "../../landing/LandingPage.tsx";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -46,7 +46,7 @@ export function ProtectedRoute({
   }
 
   if (status !== "authenticated" || !user) {
-    return <LoginPage />;
+    return <LandingPage />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {

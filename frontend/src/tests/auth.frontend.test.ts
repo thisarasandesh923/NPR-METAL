@@ -224,12 +224,22 @@ describe("Phase 3B — Frontend Authentication API, RBAC Guards & React UI Tests
     assert.equal(getDefaultScreenForRole("CASHIER"), "cashier-dashboard");
     assert.equal(canAccessScreen("CASHIER", "owner-dashboard"), false);
     assert.equal(canAccessScreen("OWNER", "owner-dashboard"), true);
+    assert.equal(canAccessScreen("OWNER", "cashier-dashboard"), false);
+    assert.equal(canAccessScreen("CASHIER", "cashier-dashboard"), true);
     assert.equal(
       resolveAuthorizedScreen("CASHIER", "owner-dashboard"),
       "cashier-dashboard"
     );
     assert.equal(
+      resolveAuthorizedScreen("OWNER", "cashier-dashboard"),
+      "owner-dashboard"
+    );
+    assert.equal(
       getNavItemsForRole("CASHIER").some((i) => i.screen === "owner-dashboard"),
+      false
+    );
+    assert.equal(
+      getNavItemsForRole("OWNER").some((i) => i.screen === "cashier-dashboard"),
       false
     );
   });

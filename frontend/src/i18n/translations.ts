@@ -7,6 +7,8 @@ export interface Translations {
   appTitle: string;
   workspace: string;
   locationKurunegala: string;
+  locationSeenimodara: string;
+  businessProprietor: string;
   roleOwner: string;
   roleCashier: string;
   languageToggle: string;
@@ -145,6 +147,7 @@ export interface Translations {
   paymentLedgerCard: string;
   recordPaymentBtn: string;
   printA5Btn: string;
+  printThermalBtn: string;
   createAnotherBtn: string;
   issuedByLabel: string;
   totalLkr: string;
@@ -206,7 +209,9 @@ export const translations: Record<Language, Translations> = {
     appCrusherTagline: "Crusher & Workshop",
     appTitle: "NPR Metal Crusher — Billing & Management System",
     workspace: "Workspace",
-    locationKurunegala: "Kurunegala, Sri Lanka",
+    locationKurunegala: "Seenimodara, Sri Lanka",
+    locationSeenimodara: "Seenimodara, Sri Lanka",
+    businessProprietor: "Proprietor: Nalaka Ranasinghe",
     roleOwner: "Owner",
     roleCashier: "Cashier",
     languageToggle: "සිංහල",
@@ -345,6 +350,7 @@ export const translations: Record<Language, Translations> = {
     paymentLedgerCard: "Cash Payment Ledger",
     recordPaymentBtn: "Record Cash Payment",
     printA5Btn: "Print A5 Invoice",
+    printThermalBtn: "Print 80mm Receipt",
     createAnotherBtn: "+ Create Another Invoice",
     issuedByLabel: "Issued By",
     totalLkr: "Grand Total",
@@ -405,7 +411,9 @@ export const translations: Record<Language, Translations> = {
     appCrusherTagline: "ක්‍රෂර් සහ වැඩපොළ",
     appTitle: "NPR මෙටල් ක්‍රෂර් — බිල්පත් සහ කළමනාකරණ පද්ධතිය",
     workspace: "වැඩබිම",
-    locationKurunegala: "කුරුණෑගල, ශ්‍රී ලංකා",
+    locationKurunegala: "සීනිමෝදර, ශ්‍රී ලංකා",
+    locationSeenimodara: "සීනිමෝදර, ශ්‍රී ලංකා",
+    businessProprietor: "හිමිකරු: නාලක රණසිංහ",
     roleOwner: "හිමිකරු",
     roleCashier: "මුදල් අයකැමි",
     languageToggle: "English",
@@ -544,6 +552,7 @@ export const translations: Record<Language, Translations> = {
     paymentLedgerCard: "මුදල් ගෙවීම් ලේඛනය",
     recordPaymentBtn: "මුදල් ගෙවීමක් සටහන් කරන්න",
     printA5Btn: "A5 බිල්පත මුද්‍රණය කරන්න",
+    printThermalBtn: "80mm රිසිට්පත මුද්‍රණය කරන්න",
     createAnotherBtn: "+ තවත් බිල්පතක් සකසන්න",
     issuedByLabel: "නිකුත් කළේ",
     totalLkr: "මුළු මුදල",

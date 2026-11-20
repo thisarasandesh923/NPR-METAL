@@ -14,6 +14,7 @@ import {
   formatLkr,
 } from "../../../utils/formatters.ts";
 import { InvoicePrintA5 } from "./InvoicePrintA5.tsx";
+import { InvoicePrintThermal80 } from "./InvoicePrintThermal80.tsx";
 import { RecordPaymentModal } from "./RecordPaymentModal.tsx";
 
 interface InvoiceDetailPageProps {
@@ -132,6 +133,43 @@ export function InvoiceDetailPage({
   const canRecordPayment =
     invoice.invoiceStatus === "ISSUED" && Number(invoice.balanceDue) > 0;
 
+  const handlePrint = (format: "a5" | "thermal80") => {
+    if (typeof document === "undefined" || typeof window === "undefined") {
+      return;
+    }
+
+    document.body.setAttribute("data-print-format", format);
+
+    let styleEl = document.getElementById(
+      "npr-print-page-style"
+    ) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "npr-print-page-style";
+      document.head.appendChild(styleEl);
+    }
+
+    if (format === "thermal80") {
+      styleEl.textContent = "@page { size: 80mm auto; margin: 2mm 0mm; }";
+    } else {
+      styleEl.textContent = "@page { size: A5 portrait; margin: 8mm; }";
+    }
+
+    const cleanup = () => {
+      document.body.removeAttribute("data-print-format");
+      if (styleEl && styleEl.parentNode) {
+        styleEl.parentNode.removeChild(styleEl);
+      }
+      window.removeEventListener("afterprint", cleanup);
+    };
+
+    window.addEventListener("afterprint", cleanup);
+
+    if (typeof window.print === "function") {
+      window.print();
+    }
+  };
+
   return (
     <>
       <div className="no-print mx-auto max-w-[1250px] p-4 md:p-8 lg:p-10">
@@ -195,11 +233,19 @@ export function InvoiceDetailPage({
             )}
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => handlePrint("a5")}
               className="inline-flex items-center gap-2 rounded-xl bg-[#f58220] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#e77418]"
             >
               <Icon name="print" className="h-4 w-4" />
               {t("printA5Btn")}
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePrint("thermal80")}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#092547] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#103462]"
+            >
+              <Icon name="print" className="h-4 w-4" />
+              {t("printThermalBtn")}
             </button>
           </div>
         </div>
@@ -401,6 +447,7 @@ export function InvoiceDetailPage({
       </div>
 
       <InvoicePrintA5 invoice={invoice} />
+      <InvoicePrintThermal80 invoice={invoice} />
 
       {showPaymentModal && (
         <RecordPaymentModal

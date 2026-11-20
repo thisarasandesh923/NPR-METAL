@@ -211,9 +211,23 @@ export async function fetchFinancialReport(
       [dateFrom, dateTo]
     ),
     pool.query<{ salary_paid: string }>(
-      `SELECT COALESCE(SUM(amount), 0.00)::NUMERIC(12, 2)::text AS salary_paid
-       FROM public.salary_payments
-       WHERE payment_date BETWEEN $1::date AND $2::date`,
+      `SELECT COALESCE(
+         SUM(
+           COALESCE(
+             (
+               SELECT spa.corrected_amount
+               FROM public.salary_payment_adjustments spa
+               WHERE spa.salary_payment_id = sp.id
+               ORDER BY spa.id DESC
+               LIMIT 1
+             ),
+             sp.amount
+           )
+         ),
+         0.00
+       )::NUMERIC(12, 2)::text AS salary_paid
+       FROM public.salary_payments sp
+       WHERE sp.payment_date BETWEEN $1::date AND $2::date`,
       [dateFrom, dateTo]
     ),
     pool.query<{
@@ -645,9 +659,25 @@ export async function fetchPayrollExportRows(
 
   const res = await pool.query<Record<string, string | number | null>>(
     `WITH paid_totals AS (
-       SELECT payroll_entry_id, COALESCE(SUM(amount), 0.00)::NUMERIC(12, 2) AS paid_amount
-       FROM public.salary_payments
-       GROUP BY payroll_entry_id
+       SELECT
+         sp.payroll_entry_id,
+         COALESCE(
+           SUM(
+             COALESCE(
+               (
+                 SELECT spa.corrected_amount
+                 FROM public.salary_payment_adjustments spa
+                 WHERE spa.salary_payment_id = sp.id
+                 ORDER BY spa.id DESC
+                 LIMIT 1
+               ),
+               sp.amount
+             )
+           ),
+           0.00
+         )::NUMERIC(12, 2) AS paid_amount
+       FROM public.salary_payments sp
+       GROUP BY sp.payroll_entry_id
      )
      SELECT
        pp.period_label,

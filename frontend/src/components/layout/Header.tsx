@@ -80,7 +80,7 @@ export function Header({ user, onOpenMenu, currentScreen }: HeaderProps) {
             {formatColomboDate(language)}
           </p>
           <p className="mt-0.5 text-xs text-slate-400">
-            {t("locationKurunegala")}
+            {t("locationSeenimodara")}
           </p>
         </div>
       </div>

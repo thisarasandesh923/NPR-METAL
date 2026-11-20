@@ -17,6 +17,7 @@ import {
   isValidUserRole,
   type AuthContext,
   type SafeAuthUser,
+  type UserRole,
 } from "./auth.types.js";
 import { generateSessionToken, hashSessionToken } from "./cookies.js";
 import { verifyAgainstDummyPassword, verifyPassword } from "./password.js";
@@ -27,6 +28,7 @@ export interface LoginInput {
   ipAddress: string;
   userAgent: string | null;
   existingSessionToken?: string;
+  portal?: UserRole;
 }
 
 export interface LoginResult {
@@ -153,6 +155,30 @@ export class AuthService {
         throw new UnauthorizedError(
           "Invalid username or password.",
           "INVALID_CREDENTIALS"
+        );
+      }
+
+      // Cross-role login protection: enforce portal selection against the user's authoritative server-stored role
+      if (input.portal && userRow.role !== input.portal) {
+        await insertAuthAuditLog(client, {
+          userId: userRow.id,
+          action: "LOGIN_FAILED",
+          entityType: "AUTH_LOGIN",
+          entityId: userEntityId,
+          details: {
+            reason: "CROSS_ROLE_PORTAL_MISMATCH",
+            portal: input.portal,
+            actualRole: userRow.role,
+          },
+          ipAddress,
+        });
+        await client.query("COMMIT");
+        inTransaction = false;
+        throw new UnauthorizedError(
+          input.portal === "OWNER"
+            ? "Access denied. Only Owner accounts can sign in through the Owner Portal."
+            : "Access denied. Only Cashier accounts can sign in through the Cashier Portal.",
+          "CROSS_ROLE_LOGIN_FORBIDDEN"
         );
       }
 

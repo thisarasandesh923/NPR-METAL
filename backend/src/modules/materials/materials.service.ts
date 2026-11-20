@@ -9,6 +9,7 @@ import { insertAuthAuditLog } from "../auth/auth.repository.js";
 import {
   insertMaterialPriceHistory,
   listActiveMaterials,
+  listMaterials,
   listMaterialPriceHistory,
   lockMaterialById,
   updateMaterialPriceRow,
@@ -16,7 +17,9 @@ import {
 import type {
   MaterialCatalogItem,
   MaterialPriceHistoryDto,
+  MaterialPriceHistoryFilters,
   MaterialRow,
+  UpdateMaterialPriceInput,
 } from "./materials.types.js";
 
 function mapMaterialRow(row: MaterialRow): MaterialCatalogItem {
@@ -35,15 +38,19 @@ function mapMaterialRow(row: MaterialRow): MaterialCatalogItem {
 export class MaterialsService {
   constructor(private readonly pool: Pool) {}
 
-  async getActiveMaterials(): Promise<MaterialCatalogItem[]> {
-    const rows = await listActiveMaterials(this.pool);
+  async getMaterials(includeInactive = false): Promise<MaterialCatalogItem[]> {
+    const rows = await listMaterials(this.pool, includeInactive);
     return rows.map(mapMaterialRow);
   }
 
+  async getActiveMaterials(): Promise<MaterialCatalogItem[]> {
+    return this.getMaterials(false);
+  }
+
   async getPriceHistory(
-    materialId?: number
+    filters?: MaterialPriceHistoryFilters | number
   ): Promise<MaterialPriceHistoryDto[]> {
-    const rows = await listMaterialPriceHistory(this.pool, materialId, 100);
+    const rows = await listMaterialPriceHistory(this.pool, filters, 100);
     return rows.map((row) => ({
       id: Number(row.id),
       materialId: row.material_id,
@@ -52,7 +59,9 @@ export class MaterialsService {
       oldPrice: row.old_price,
       newPrice: row.new_price,
       changedByUserId: row.changed_by_user_id,
+      changedByUsername: row.changed_by_username,
       changedByName: row.changed_by_name,
+      changedByRole: row.changed_by_role,
       reason: row.reason,
       createdAt: row.created_at.toISOString(),
     }));
@@ -64,8 +73,15 @@ export class MaterialsService {
       newPrice: string | number;
       reason: string;
       expectedVersion: number;
+      isActive?: boolean;
     },
-    actor: { ownerUserId: string; ipAddress: string }
+    actor: {
+      userId?: string;
+      ownerUserId?: string;
+      username?: string;
+      role?: string;
+      ipAddress: string;
+    }
   ): Promise<MaterialCatalogItem> {
     let newPriceCents: bigint;
     try {
@@ -76,11 +92,15 @@ export class MaterialsService {
       );
     }
 
-    if (newPriceCents < 0n || newPriceCents > 9_999_999_999_99n) {
-      throw new ValidationError("Selling price is out of valid bounds.");
+    if (newPriceCents <= 0n || newPriceCents > 9_999_999_999_99n) {
+      throw new ValidationError("Selling price must be greater than Rs. 0.00.");
     }
 
     const newPriceStr = formatScaledDecimal(newPriceCents, 2);
+    const actorUserId = actor.userId ?? actor.ownerUserId;
+    if (!actorUserId) {
+      throw new ValidationError("User identifier is required.");
+    }
 
     const client = await this.pool.connect();
     let inTx = false;
@@ -100,14 +120,40 @@ export class MaterialsService {
         );
       }
 
+      // Cashiers can only update prices for active materials
+      if (!current.is_active && actor.role !== "OWNER") {
+        throw new ValidationError(
+          "Cashiers can only update prices for active materials. Inactive materials must be configured and activated by the Owner."
+        );
+      }
+
+      // Cashiers are strictly forbidden from modifying active/inactive status
+      if (input.isActive !== undefined && actor.role !== "OWNER") {
+        throw new ValidationError(
+          "Only Owner accounts are permitted to activate or deactivate materials."
+        );
+      }
+
+      const targetIsActive =
+        input.isActive !== undefined ? input.isActive : current.is_active;
+
+      if (targetIsActive && newPriceCents <= 0n) {
+        throw new ValidationError(
+          "Cannot activate a material without a valid positive selling price."
+        );
+      }
+
       const oldPriceCents = parseScaledDecimal(
         current.current_unit_price,
         2,
         "Current price"
       );
-      if (oldPriceCents === newPriceCents) {
+      if (
+        oldPriceCents === newPriceCents &&
+        current.is_active === targetIsActive
+      ) {
         throw new ValidationError(
-          "New price must differ from the current selling price."
+          "New price or activation status must differ from current state."
         );
       }
 
@@ -115,6 +161,7 @@ export class MaterialsService {
         materialId: current.id,
         newPrice: newPriceStr,
         expectedVersion: input.expectedVersion,
+        isActive: targetIsActive,
       });
 
       if (!updated) {
@@ -128,12 +175,12 @@ export class MaterialsService {
         materialId: current.id,
         oldPrice: current.current_unit_price,
         newPrice: newPriceStr,
-        changedByUserId: actor.ownerUserId,
+        changedByUserId: actorUserId,
         reason: input.reason.trim(),
       });
 
       await insertAuthAuditLog(client, {
-        userId: actor.ownerUserId,
+        userId: actorUserId,
         action: "UPDATE_MATERIAL_PRICE",
         entityType: "MATERIAL",
         entityId: String(current.id),
@@ -142,7 +189,11 @@ export class MaterialsService {
           name: current.name,
           oldPrice: current.current_unit_price,
           newPrice: newPriceStr,
+          oldIsActive: current.is_active,
+          newIsActive: targetIsActive,
           reason: input.reason.trim(),
+          actorUsername: actor.username ?? null,
+          actorRole: actor.role ?? null,
         },
         ipAddress: actor.ipAddress,
       });

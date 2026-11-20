@@ -92,20 +92,27 @@ async function main(): Promise<void> {
     );
     const cashierId = cashierRes.rows[0].id;
 
-    // 2. Workshop Aggregates Catalog
+    // 2. Workshop Aggregates Catalog (11 Approved Products)
     const materialIds: Record<string, number> = {};
     for (const mat of [
-      { code: "3/4", name: '3/4"', price: "12000.00" },
-      { code: "DUST", name: "Dust", price: "8500.00" },
-      { code: "6X9", name: "6×9", price: "10250.00" },
-      { code: "ABC", name: "ABC", price: "11000.00" },
+      { code: "3/4", name: "3/4 Metal", price: "12000.00", isActive: true },
+      { code: "DUST", name: "Dust", price: "8500.00", isActive: true },
+      { code: "CHIP", name: "Chip", price: "0.00", isActive: false },
+      { code: "6X9", name: "6×9 (Aggregate)", price: "10250.00", isActive: true },
+      { code: "2X2", name: "2×2", price: "0.00", isActive: false },
+      { code: "1_INCH", name: '1" (Inch)', price: "0.00", isActive: false },
+      { code: "1_1/2", name: "1 1/2", price: "0.00", isActive: false },
+      { code: "ABC", name: "ABC", price: "11000.00", isActive: true },
+      { code: "SUBBASE", name: "SubBase", price: "0.00", isActive: false },
+      { code: "MIX", name: "Mix (Dust & Chip)", price: "0.00", isActive: false },
+      { code: "QUARRY_MUCK", name: "Quarry Muck", price: "0.00", isActive: false },
     ]) {
       const mRes = await client.query<{ id: number }>(
         `INSERT INTO public.materials (code, name, unit, current_unit_price, is_active)
-         VALUES ($1, $2, 'm³', $3, true)
+         VALUES ($1, $2, 'm³', $3, $4)
          ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name
          RETURNING id`,
-        [mat.code, mat.name, mat.price]
+        [mat.code, mat.name, mat.price, mat.isActive]
       );
       materialIds[mat.code] = mRes.rows[0].id;
     }

@@ -17,6 +17,8 @@ import {
   verifyAgainstDummyPassword,
   verifyPassword,
 } from "../modules/auth/password.js";
+import { AuthService } from "../modules/auth/auth.service.js";
+import { UnauthorizedError } from "../errors/appError.js";
 import type { NextFunction, Request, Response } from "express";
 
 describe("Phase 3A — Auth Unit Tests (Hashing, Cookies, SecurityConfig & RBAC)", () => {
@@ -225,5 +227,225 @@ describe("Phase 3A — Auth Unit Tests (Hashing, Cookies, SecurityConfig & RBAC)
     assert.equal(prodPassed, false, "Mobile LAN origin must be blocked in production unless in ALLOWED_ORIGINS");
     assert.equal((prodErr as { statusCode?: number })?.statusCode, 403);
     assert.equal((prodErr as { code?: string })?.code, "ORIGIN_NOT_ALLOWED");
+  });
+
+  // --------------------------------------------------------------------------
+  // CROSS-ROLE PORTAL LOGIN VERIFICATION
+  // --------------------------------------------------------------------------
+  it("enforces cross-role login restrictions: accepts valid roles on their own portal and rejects cross-portal logins", async () => {
+    const ownerPwdHash = await hashPassword("OwnerSecret!2026");
+    const cashierPwdHash = await hashPassword("CashierSecret!2026");
+
+    const ownerRow = {
+      id: "00000000-0000-0000-0000-000000000001",
+      username: "owner_npr",
+      password_hash: ownerPwdHash,
+      full_name: "Bandara Wijekoon",
+      role: "OWNER",
+      is_active: true,
+    };
+
+    const cashierRow = {
+      id: "c0000000-0000-0000-0000-000000000001",
+      username: "cashier_sarath",
+      password_hash: cashierPwdHash,
+      full_name: "Sarath Cashier",
+      role: "CASHIER",
+      is_active: true,
+    };
+
+    function createMockAuthPool(activeUserRow: any) {
+      const auditLogs: any[] = [];
+      const sessionsCreated: any[] = [];
+      let committed = false;
+      let rolledBack = false;
+
+      const mockClient = {
+        query: async (sql: string, params?: unknown[]) => {
+          if (sql === "BEGIN") return { rows: [] };
+          if (sql === "COMMIT") {
+            committed = true;
+            return { rows: [] };
+          }
+          if (sql === "ROLLBACK") {
+            rolledBack = true;
+            return { rows: [] };
+          }
+          if (sql.includes("pg_advisory_xact_lock")) return { rows: [] };
+          if (sql.includes("SELECT MAX(created_at) AS last_success_at"))
+            return { rows: [{ last_success_at: null }] };
+          if (sql.includes("SELECT COUNT(*)::int AS cnt"))
+            return { rows: [{ cnt: 0, oldest_at: null }] };
+          if (sql.includes("FROM public.users"))
+            return { rows: activeUserRow ? [activeUserRow] : [] };
+          if (sql.includes("INSERT INTO public.audit_logs")) {
+            auditLogs.push({ sql, params });
+            return { rows: [] };
+          }
+          if (sql.includes("DELETE FROM public.user_sessions")) return { rows: [] };
+          if (sql.includes("INSERT INTO public.user_sessions")) {
+            sessionsCreated.push({ sql, params });
+            return {
+              rows: [
+                {
+                  id: "sess-1",
+                  expires_at: new Date(Date.now() + 3600000),
+                  created_at: new Date(),
+                },
+              ],
+            };
+          }
+          return { rows: [] };
+        },
+        release: () => {},
+      };
+
+      const mockPool = {
+        connect: async () => mockClient,
+      } as unknown as Pool;
+
+      return { mockPool, auditLogs, sessionsCreated, isCommitted: () => committed };
+    }
+
+    const testConfig = resolveSecurityConfig({ NODE_ENV: "development" });
+
+    // 1. Owner on Owner portal -> SUCCESS
+    {
+      const { mockPool, sessionsCreated, auditLogs } = createMockAuthPool(ownerRow);
+      const authService = new AuthService(mockPool, testConfig);
+      const result = await authService.login({
+        username: "owner_npr",
+        password: "OwnerSecret!2026",
+        portal: "OWNER",
+        ipAddress: "127.0.0.1",
+        userAgent: "TestAgent",
+      });
+      assert.equal(result.user.role, "OWNER");
+      assert.equal(sessionsCreated.length, 1, "Session must be created for valid Owner login");
+      assert.ok(auditLogs.some((l) => l.params?.[1] === "LOGIN_SUCCEEDED"));
+    }
+
+    // 2. Cashier on Cashier portal -> SUCCESS
+    {
+      const { mockPool, sessionsCreated, auditLogs } = createMockAuthPool(cashierRow);
+      const authService = new AuthService(mockPool, testConfig);
+      const result = await authService.login({
+        username: "cashier_sarath",
+        password: "CashierSecret!2026",
+        portal: "CASHIER",
+        ipAddress: "127.0.0.1",
+        userAgent: "TestAgent",
+      });
+      assert.equal(result.user.role, "CASHIER");
+      assert.equal(sessionsCreated.length, 1, "Session must be created for valid Cashier login");
+      assert.ok(auditLogs.some((l) => l.params?.[1] === "LOGIN_SUCCEEDED"));
+    }
+
+    // 3. Owner credentials on Cashier portal -> REJECT (CROSS_ROLE_LOGIN_FORBIDDEN)
+    {
+      const { mockPool, sessionsCreated, auditLogs, isCommitted } = createMockAuthPool(ownerRow);
+      const authService = new AuthService(mockPool, testConfig);
+      let capturedError: any = null;
+      try {
+        await authService.login({
+          username: "owner_npr",
+          password: "OwnerSecret!2026",
+          portal: "CASHIER",
+          ipAddress: "127.0.0.1",
+          userAgent: "TestAgent",
+        });
+      } catch (err) {
+        capturedError = err;
+      }
+      assert.ok(capturedError instanceof UnauthorizedError);
+      assert.equal(capturedError.statusCode, 401);
+      assert.equal(capturedError.code, "CROSS_ROLE_LOGIN_FORBIDDEN");
+      assert.match(capturedError.message, /Only Cashier accounts can sign in through the Cashier Portal/i);
+      assert.equal(sessionsCreated.length, 0, "No session must be created for cross-role login attempt");
+      assert.equal(isCommitted(), true, "Audit log transaction must be committed");
+      assert.ok(
+        auditLogs.some(
+          (l) =>
+            l.params?.[1] === "LOGIN_FAILED" &&
+            l.params?.[4]?.includes("CROSS_ROLE_PORTAL_MISMATCH")
+        ),
+        "Audit log must record CROSS_ROLE_PORTAL_MISMATCH"
+      );
+    }
+
+    // 4. Cashier credentials on Owner portal -> REJECT (CROSS_ROLE_LOGIN_FORBIDDEN)
+    {
+      const { mockPool, sessionsCreated, auditLogs, isCommitted } = createMockAuthPool(cashierRow);
+      const authService = new AuthService(mockPool, testConfig);
+      let capturedError: any = null;
+      try {
+        await authService.login({
+          username: "cashier_sarath",
+          password: "CashierSecret!2026",
+          portal: "OWNER",
+          ipAddress: "127.0.0.1",
+          userAgent: "TestAgent",
+        });
+      } catch (err) {
+        capturedError = err;
+      }
+      assert.ok(capturedError instanceof UnauthorizedError);
+      assert.equal(capturedError.statusCode, 401);
+      assert.equal(capturedError.code, "CROSS_ROLE_LOGIN_FORBIDDEN");
+      assert.match(capturedError.message, /Only Owner accounts can sign in through the Owner Portal/i);
+      assert.equal(sessionsCreated.length, 0, "No session must be created for cross-role login attempt");
+      assert.equal(isCommitted(), true, "Audit log transaction must be committed");
+      assert.ok(
+        auditLogs.some(
+          (l) =>
+            l.params?.[1] === "LOGIN_FAILED" &&
+            l.params?.[4]?.includes("CROSS_ROLE_PORTAL_MISMATCH")
+        ),
+        "Audit log must record CROSS_ROLE_PORTAL_MISMATCH"
+      );
+    }
+
+    // 5. Invalid credentials on either portal -> REJECT (INVALID_CREDENTIALS)
+    {
+      const { mockPool, sessionsCreated } = createMockAuthPool(ownerRow);
+      const authService = new AuthService(mockPool, testConfig);
+      let capturedError: any = null;
+      try {
+        await authService.login({
+          username: "owner_npr",
+          password: "WrongPassword!999",
+          portal: "OWNER",
+          ipAddress: "127.0.0.1",
+          userAgent: "TestAgent",
+        });
+      } catch (err) {
+        capturedError = err;
+      }
+      assert.ok(capturedError instanceof UnauthorizedError);
+      assert.equal(capturedError.code, "INVALID_CREDENTIALS");
+      assert.equal(sessionsCreated.length, 0);
+    }
+
+    // 6. Inactive account on either portal -> REJECT (INVALID_CREDENTIALS)
+    {
+      const inactiveOwner = { ...ownerRow, is_active: false };
+      const { mockPool, sessionsCreated } = createMockAuthPool(inactiveOwner);
+      const authService = new AuthService(mockPool, testConfig);
+      let capturedError: any = null;
+      try {
+        await authService.login({
+          username: "owner_npr",
+          password: "OwnerSecret!2026",
+          portal: "OWNER",
+          ipAddress: "127.0.0.1",
+          userAgent: "TestAgent",
+        });
+      } catch (err) {
+        capturedError = err;
+      }
+      assert.ok(capturedError instanceof UnauthorizedError);
+      assert.equal(capturedError.code, "INVALID_CREDENTIALS");
+      assert.equal(sessionsCreated.length, 0);
+    }
   });
 });

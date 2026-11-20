@@ -430,13 +430,27 @@ describe("Operations, Approvals, Payroll, Reports & Payment Adjustments — PG 1
     assert.equal(editApproved.status, 409);
   });
 
-  it("strictly isolates Payroll, Expenses, Reports & Payment Adjustments to OWNER", async () => {
+  it("permits Cashier read/record access to Payroll & Expenses while isolating privileged actions to OWNER", async () => {
+    // Phase 2: Cashier CAN read compensation, periods, advances, and expenses
+    for (const path of [
+      "/api/payroll/compensation",
+      "/api/payroll/periods",
+      "/api/payroll/advances",
+      "/api/expenses",
+    ]) {
+      const res = await api(cashierCookie, "GET", path);
+      assert.equal(res.status, 200, `Expected Cashier to have read access to ${path}`);
+    }
+
+    // Phase 2: Cashier is STRICTLY BLOCKED (403) on privileged Owner endpoints
     for (const [method, path] of [
-      ["GET", "/api/payroll/compensation"],
-      ["GET", "/api/payroll/periods"],
-      ["GET", "/api/payroll/advances"],
+      ["POST", "/api/payroll/periods"],
+      ["POST", "/api/payroll/periods/1/prepare"],
+      ["PUT", "/api/payroll/entries/1"],
+      ["POST", "/api/payroll/entries/1/approve"],
+      ["POST", "/api/payroll/entries/1/payments"],
       ["GET", "/api/payroll/payments"],
-      ["GET", "/api/expenses"],
+      ["GET", "/api/payroll/compensation/history"],
       ["GET", "/api/approvals/pending"],
       ["GET", "/api/reports/overview"],
       ["GET", "/api/reports/financial"],
@@ -457,13 +471,34 @@ describe("Operations, Approvals, Payroll, Reports & Payment Adjustments — PG 1
           baseRate: "600.00",
           overtimeHourlyRate: "900.00",
           effectiveFrom: "2026-11-01",
+          reason: "Configuring base hourly rate for Nimal",
         })
       ).status,
       200
     );
 
-    // Record an advance for Nimal
-    const advRes = await api(ownerCookie, "POST", "/api/payroll/advances", {
+    // Cashier updates compensation profile immediately with reason
+    const cashierRateRes = await api(cashierCookie, "PUT", "/api/payroll/compensation", {
+      workerId: hourlyWorkerId,
+      payArrangement: "HOURLY",
+      baseRate: "600.00",
+      overtimeHourlyRate: "900.00",
+      effectiveFrom: "2026-11-01",
+      reason: "Cashier verified overtime rate",
+    });
+    assert.equal(cashierRateRes.status, 200);
+
+    // Owner can view compensation audit history including Cashier's change
+    const histRes = await api(ownerCookie, "GET", `/api/payroll/compensation/history?workerId=${hourlyWorkerId}`);
+    assert.equal(histRes.status, 200);
+    const histData = (await histRes.json()) as { data: { history: Array<{ changedByUsername: string; changedByRole: string; reason: string }> } };
+    assert.ok(histData.data.history.length >= 1);
+    assert.equal(histData.data.history[0].changedByUsername, cashierUsername);
+    assert.equal(histData.data.history[0].changedByRole, "CASHIER");
+    assert.equal(histData.data.history[0].reason, "Cashier verified overtime rate");
+
+    // Record an advance for Nimal via Cashier
+    const advRes = await api(cashierCookie, "POST", "/api/payroll/advances", {
       workerId: hourlyWorkerId,
       advanceDate: "2026-11-10",
       amount: "1000.00",
@@ -472,8 +507,8 @@ describe("Operations, Approvals, Payroll, Reports & Payment Adjustments — PG 1
     });
     assert.equal(advRes.status, 201);
 
-    // Record operational expense
-    const expRes = await api(ownerCookie, "POST", "/api/expenses", {
+    // Record operational expense via Cashier
+    const expRes = await api(cashierCookie, "POST", "/api/expenses", {
       expenseDate: "2026-11-10",
       category: "FUEL",
       amount: "18500.00",

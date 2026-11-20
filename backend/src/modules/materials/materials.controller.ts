@@ -14,22 +14,27 @@ const updatePriceSchema = z.object({
     .number({ error: "expectedVersion is required." })
     .int()
     .positive("expectedVersion must be a positive integer."),
+  isActive: z.boolean().optional(),
 });
 
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
 
-  listActive = async (_req: Request, res: Response): Promise<void> => {
-    const materials = await this.materialsService.getActiveMaterials();
+  listMaterials = async (req: Request, res: Response): Promise<void> => {
+    const isOwner = req.auth?.user.role === "OWNER";
+    const includeInactive = isOwner && req.query.includeInactive === "true";
+    const materials = await this.materialsService.getMaterials(includeInactive);
     res.status(200).json({
       success: true,
       data: { materials },
     });
   };
 
+  listActive = this.listMaterials;
+
   listHistory = async (req: Request, res: Response): Promise<void> => {
     let materialId: number | undefined;
-    if (req.query.materialId !== undefined) {
+    if (req.query.materialId !== undefined && req.query.materialId !== "") {
       const parsed = Number(req.query.materialId);
       if (!Number.isInteger(parsed) || parsed <= 0) {
         throw new ValidationError("Invalid materialId filter.");
@@ -37,7 +42,30 @@ export class MaterialsController {
       materialId = parsed;
     }
 
-    const history = await this.materialsService.getPriceHistory(materialId);
+    const userId =
+      typeof req.query.userId === "string" && req.query.userId.trim() !== ""
+        ? req.query.userId.trim()
+        : typeof req.query.cashierId === "string" && req.query.cashierId.trim() !== ""
+        ? req.query.cashierId.trim()
+        : undefined;
+
+    const dateFrom =
+      typeof req.query.dateFrom === "string" && req.query.dateFrom.trim() !== ""
+        ? req.query.dateFrom.trim()
+        : undefined;
+
+    const dateTo =
+      typeof req.query.dateTo === "string" && req.query.dateTo.trim() !== ""
+        ? req.query.dateTo.trim()
+        : undefined;
+
+    const history = await this.materialsService.getPriceHistory({
+      materialId,
+      userId,
+      dateFrom,
+      dateTo,
+    });
+
     res.status(200).json({
       success: true,
       data: { history },
@@ -64,6 +92,12 @@ export class MaterialsController {
       );
     }
 
+    if (parsed.data.isActive !== undefined && req.auth.user.role !== "OWNER") {
+      throw new ValidationError(
+        "Only Owner accounts are permitted to activate or deactivate materials."
+      );
+    }
+
     const ipAddress = (req.ip || req.socket.remoteAddress || "unknown").slice(
       0,
       45
@@ -74,9 +108,12 @@ export class MaterialsController {
         newPrice: parsed.data.newPrice,
         reason: parsed.data.reason,
         expectedVersion: parsed.data.expectedVersion,
+        isActive: parsed.data.isActive,
       },
       {
-        ownerUserId: req.auth.user.id,
+        userId: req.auth.user.id,
+        username: req.auth.user.username,
+        role: req.auth.user.role,
         ipAddress,
       }
     );

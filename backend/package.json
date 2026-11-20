@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "tsx --test src/tests/**/*.test.ts",
-    "test:unit": "tsx --test src/tests/db-config.test.ts src/tests/auth-unit.test.ts src/tests/money-unit.test.ts src/tests/time-exports-unit.test.ts",
+    "test:unit": "tsx --test src/tests/db-config.test.ts src/tests/auth-unit.test.ts src/tests/money-unit.test.ts src/tests/time-exports-unit.test.ts src/tests/materials-catalog-unit.test.ts src/tests/payroll-cashier-disbursement.test.ts src/tests/payroll-owner-corrections.test.ts src/tests/reports-salary-adjustments-unit.test.ts src/tests/password-reset-hardened.test.ts",
     "test:auth": "tsx --test src/tests/auth.test.ts",
     "test:billing": "tsx --test src/tests/billing.test.ts",
     "test:operations": "tsx --test src/tests/operations-payroll.test.ts",
@@ -15,6 +15,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "diagnose:auth": "tsx src/scripts/diagnose-auth.ts",
+    "reset:password": "tsx src/scripts/reset-user-password.ts",
     "db:check": "tsx src/scripts/check-db.ts",
     "migrate:check": "tsx src/scripts/check-migrations.ts",
     "migrate:status": "tsx src/scripts/migration-status.ts",

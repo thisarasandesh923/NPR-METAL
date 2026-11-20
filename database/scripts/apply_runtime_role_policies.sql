@@ -236,7 +236,7 @@ CREATE POLICY app_price_history_insert ON material_price_history FOR INSERT TO n
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM users u
-            WHERE u.id = changed_by_user_id AND u.role = 'OWNER' AND u.is_active = true
+            WHERE u.id = changed_by_user_id AND u.role IN ('OWNER', 'CASHIER') AND u.is_active = true
         )
     );
 
@@ -314,6 +314,10 @@ BEGIN
             enforce_salary_payment_bounds()
         FROM npr_app_user;
 
+        IF to_regprocedure('enforce_payroll_period_immutability()') IS NOT NULL THEN
+            REVOKE ALL ON FUNCTION enforce_payroll_period_immutability() FROM npr_app_user;
+        END IF;
+
         GRANT USAGE, SELECT ON SEQUENCE
             advance_number_seq,
             salary_receipt_number_seq,
@@ -359,7 +363,7 @@ BEGIN
             WITH CHECK (
                 EXISTS (
                     SELECT 1 FROM users u
-                    WHERE u.id = updated_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                    WHERE u.id = updated_by_owner_id AND u.role IN ('OWNER', 'CASHIER') AND u.is_active = true
                 )
             );
 
@@ -381,12 +385,30 @@ BEGIN
         CREATE POLICY app_op_history_insert ON operational_approval_history FOR INSERT TO npr_app_user WITH CHECK (true);
 
         DROP POLICY IF EXISTS app_payroll_periods_all ON payroll_periods;
-        CREATE POLICY app_payroll_periods_all ON payroll_periods FOR ALL TO npr_app_user
+        DROP POLICY IF EXISTS app_payroll_periods_select ON payroll_periods;
+        DROP POLICY IF EXISTS app_payroll_periods_insert ON payroll_periods;
+        DROP POLICY IF EXISTS app_payroll_periods_update ON payroll_periods;
+        CREATE POLICY app_payroll_periods_select ON payroll_periods FOR SELECT TO npr_app_user USING (true);
+        CREATE POLICY app_payroll_periods_insert ON payroll_periods FOR INSERT TO npr_app_user
+            WITH CHECK (
+                EXISTS (
+                    SELECT 1 FROM users u
+                    WHERE u.id = created_by_owner_id AND u.role IN ('OWNER', 'CASHIER') AND u.is_active = true
+                )
+            );
+        CREATE POLICY app_payroll_periods_update ON payroll_periods FOR UPDATE TO npr_app_user
             USING (true)
             WITH CHECK (
                 EXISTS (
                     SELECT 1 FROM users u
-                    WHERE u.id = created_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                    WHERE u.id = created_by_owner_id AND u.role IN ('OWNER', 'CASHIER') AND u.is_active = true
+                )
+                AND (
+                    approved_by_owner_id IS NULL
+                    OR EXISTS (
+                        SELECT 1 FROM users u
+                        WHERE u.id = approved_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                    )
                 )
             );
 
@@ -400,7 +422,7 @@ BEGIN
             WITH CHECK (
                 EXISTS (
                     SELECT 1 FROM users u
-                    WHERE u.id = authorized_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                    WHERE u.id = authorized_by_owner_id AND u.role IN ('OWNER', 'CASHIER') AND u.is_active = true
                 )
             );
 
@@ -411,7 +433,7 @@ BEGIN
             WITH CHECK (
                 EXISTS (
                     SELECT 1 FROM users u
-                    WHERE u.id = paid_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                    WHERE u.id = paid_by_owner_id AND u.role IN ('OWNER', 'CASHIER') AND u.is_active = true
                 )
             );
 
@@ -422,9 +444,31 @@ BEGIN
             WITH CHECK (
                 EXISTS (
                     SELECT 1 FROM users u
-                    WHERE u.id = recorded_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                    WHERE u.id = recorded_by_owner_id AND u.role IN ('OWNER', 'CASHIER') AND u.is_active = true
                 )
             );
+
+        IF to_regclass('public.salary_payment_adjustments') IS NOT NULL THEN
+            REVOKE ALL ON FUNCTION enforce_salary_payment_adjustment_bounds() FROM npr_app_user;
+
+            GRANT USAGE, SELECT ON SEQUENCE salary_adjustment_number_seq TO npr_app_user;
+            GRANT USAGE, SELECT ON SEQUENCE salary_payment_adjustments_id_seq TO npr_app_user;
+            GRANT SELECT, INSERT ON salary_payment_adjustments TO npr_app_user;
+
+            DROP POLICY IF EXISTS app_salary_payment_adjustments_select ON salary_payment_adjustments;
+            CREATE POLICY app_salary_payment_adjustments_select ON salary_payment_adjustments
+                FOR SELECT TO npr_app_user USING (true);
+
+            DROP POLICY IF EXISTS app_salary_payment_adjustments_insert ON salary_payment_adjustments;
+            CREATE POLICY app_salary_payment_adjustments_insert ON salary_payment_adjustments
+                FOR INSERT TO npr_app_user
+                WITH CHECK (
+                    EXISTS (
+                        SELECT 1 FROM users u
+                        WHERE u.id = authorized_by_owner_id AND u.role = 'OWNER' AND u.is_active = true
+                    )
+                );
+        END IF;
     END IF;
 END
 $$;

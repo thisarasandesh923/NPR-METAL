@@ -27,7 +27,7 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
   return (
     <section
       aria-label={`Printable A5 Invoice ${invoice.invoiceNumber}`}
-      className="print-only-sheet bg-white text-[#092547]"
+      className="print-only-sheet print-a5-sheet bg-white text-[#092547]"
     >
       <div className="mx-auto max-w-[138mm] border border-slate-300 p-4 text-[11px] leading-snug">
         <header className="flex items-start justify-between border-b-2 border-[#092547] pb-3">
@@ -36,7 +36,10 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
               NPR METAL CRUSHER
             </h1>
             <p className="text-[10px] font-semibold text-slate-700">
-              එන්.පී.ආර්. මෙටල් ක්‍රෂර් · Kurunegala, Sri Lanka
+              Seenimodara, Sri Lanka
+            </p>
+            <p className="text-[9px] font-bold text-slate-600">
+              Proprietor: Nalaka Ranasinghe
             </p>
             <p className="text-[9px] uppercase tracking-[0.08em] text-slate-500">
               Aggregates: 3/4&quot;, Dust, 6×9, ABC · Crushed Metal Quarry

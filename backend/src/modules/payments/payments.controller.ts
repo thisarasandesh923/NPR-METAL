@@ -6,11 +6,15 @@ import type { PaymentsService } from "./payments.service.js";
 const recordPaymentSchema = z.object({
   invoiceId: z.number().int().positive("Valid invoiceId is required."),
   amount: z.union([z.string().trim().min(1), z.number().finite()]),
+
+  paymentMethod: z.literal("CASH").optional(),
+
   idempotencyKey: z
     .string({ error: "Idempotency key is required." })
     .trim()
     .min(16, "Idempotency key must be at least 16 characters.")
     .max(64, "Idempotency key must be at most 64 characters."),
+
   notes: z.string().trim().max(500).optional().nullable(),
 });
 
@@ -30,7 +34,7 @@ const adjustPaymentSchema = z.object({
 });
 
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(private readonly paymentsService: PaymentsService) { }
 
   record = async (req: Request, res: Response): Promise<void> => {
     if (!req.auth) {

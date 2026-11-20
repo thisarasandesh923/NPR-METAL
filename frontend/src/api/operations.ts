@@ -1,7 +1,9 @@
 import { ApiError, apiRequest } from "./client.ts";
 import type { InvoiceDetail, MaterialCatalogItem } from "../types/billing.ts";
 import type {
+  AdjustSalaryPaymentPayload,
   AttendanceRecord,
+  CompensationHistoryRecord,
   CompensationProfileRecord,
   EmploymentStatus,
   FinancialReportSummary,
@@ -19,7 +21,12 @@ import type {
   PendingApprovalsPayload,
   ProductionLogRecord,
   ReportExportFormat,
+  SalaryAdjustmentType,
+  SalaryAuditHistoryRecord,
+  SalaryPaymentAdjustmentRecord,
   SalaryPaymentRecord,
+  UpdateApprovedSalaryPayload,
+  UpdateManualSalaryPayload,
   WorkerAdvanceRecord,
   WorkerRecord,
 } from "../types/operations.ts";
@@ -27,7 +34,12 @@ import type {
 // --- Material Prices ---
 export async function updateMaterialPrice(
   materialId: number,
-  body: { newPrice: string; reason: string; expectedVersion: number }
+  body: {
+    newPrice: string;
+    reason: string;
+    expectedVersion: number;
+    isActive?: boolean;
+  }
 ): Promise<MaterialCatalogItem> {
   const data = await apiRequest<{ material: MaterialCatalogItem }>(
     `/api/materials/${materialId}/price`,
@@ -36,14 +48,58 @@ export async function updateMaterialPrice(
   return data.material;
 }
 
+export interface FetchPriceHistoryParams {
+  materialId?: number;
+  userId?: string;
+  cashierId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export async function fetchMaterialPriceHistory(
-  materialId?: number
+  params?: FetchPriceHistoryParams | number
 ): Promise<MaterialPriceHistoryRecord[]> {
-  const qs = materialId !== undefined ? `?materialId=${materialId}` : "";
-  const data = await apiRequest<{ history: MaterialPriceHistoryRecord[] }>(
+  const normParams: FetchPriceHistoryParams =
+    typeof params === "number" ? { materialId: params } : (params ?? {});
+
+  const searchParams = new URLSearchParams();
+  if (normParams.materialId !== undefined) {
+    searchParams.set("materialId", String(normParams.materialId));
+  }
+  if (normParams.userId) {
+    searchParams.set("userId", normParams.userId);
+  }
+  if (normParams.cashierId) {
+    searchParams.set("cashierId", normParams.cashierId);
+  }
+  if (normParams.dateFrom) {
+    searchParams.set("dateFrom", normParams.dateFrom);
+  }
+  if (normParams.dateTo) {
+    searchParams.set("dateTo", normParams.dateTo);
+  }
+
+  const qs = searchParams.toString() ? `?${searchParams.toString()}` : "";
+  const data = await apiRequest<{ history: any[] }>(
     `/api/materials/price-history${qs}`
   );
-  return data.history;
+  const rows = Array.isArray(data?.history) ? data.history : [];
+  return rows.map((r) => ({
+    id: r.id,
+    materialId: r.materialId,
+    materialCode: r.materialCode,
+    materialName: r.materialName,
+    oldPrice: r.oldPrice,
+    newPrice: r.newPrice,
+    changedByUserId: r.changedByUserId,
+    changedByUsername: r.changedByUsername,
+    changedByName: r.changedByName ?? r.changedByOwnerName ?? "Staff",
+    changedByRole: r.changedByRole ?? "STAFF",
+    changedByOwnerId: r.changedByUserId,
+    changedByOwnerName: r.changedByName,
+    reason: r.reason,
+    effectiveAt: r.createdAt ?? r.effectiveAt,
+  }));
 }
 
 // --- Workers & Attendance ---
@@ -412,7 +468,22 @@ export async function reviewProductionRecord(
 
 // --- Approvals Queue & History ---
 export async function fetchPendingApprovals(): Promise<PendingApprovalsPayload> {
-  return apiRequest<PendingApprovalsPayload>("/api/approvals/pending");
+  const data = await apiRequest<
+    { pending?: PendingApprovalsPayload } | PendingApprovalsPayload
+  >("/api/approvals/pending");
+
+  const pending =
+    data && typeof data === "object" && "pending" in data && data.pending
+      ? data.pending
+      : (data as PendingApprovalsPayload);
+
+  return {
+    attendance: Array.isArray(pending?.attendance) ? pending.attendance : [],
+    machineLogs: Array.isArray(pending?.machineLogs) ? pending.machineLogs : [],
+    productionLogs: Array.isArray(pending?.productionLogs)
+      ? pending.productionLogs
+      : [],
+  };
 }
 
 export async function fetchOperationalApprovalHistory(
@@ -527,12 +598,32 @@ export async function upsertCompensationProfile(body: {
   overtimeHourlyRate: string | null;
   effectiveFrom: string;
   notes?: string | null;
+  reason: string;
+  expectedVersion?: number;
 }): Promise<CompensationProfileRecord> {
   const data = await apiRequest<{ profile: CompensationProfileRecord }>(
     "/api/payroll/compensation",
     { method: "PUT", body }
   );
   return data.profile;
+}
+
+export async function fetchCompensationHistory(filters?: {
+  workerId?: number;
+  userId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<CompensationHistoryRecord[]> {
+  const sp = new URLSearchParams();
+  if (filters?.workerId) sp.set("workerId", String(filters.workerId));
+  if (filters?.userId) sp.set("userId", filters.userId);
+  if (filters?.dateFrom) sp.set("dateFrom", filters.dateFrom);
+  if (filters?.dateTo) sp.set("dateTo", filters.dateTo);
+  const qs = sp.toString();
+  const data = await apiRequest<{ history: CompensationHistoryRecord[] }>(
+    `/api/payroll/compensation/history${qs ? `?${qs}` : ""}`
+  );
+  return data.history;
 }
 
 export async function fetchPayrollPeriods(): Promise<PayrollPeriodRecord[]> {
@@ -593,6 +684,43 @@ export async function updatePayrollDraftEntry(
   return data.entry;
 }
 
+export async function updateManualSalary(
+  entryId: number,
+  body: UpdateManualSalaryPayload
+): Promise<PayrollEntryRecord> {
+  const data = await apiRequest<{ entry: PayrollEntryRecord }>(
+    `/api/payroll/entries/${entryId}/salary`,
+    { method: "PUT", body }
+  );
+  return data.entry;
+}
+
+export async function initializeManualPeriod(
+  periodId: number
+): Promise<PayrollEntryRecord[]> {
+  const data = await apiRequest<{ entries: PayrollEntryRecord[] }>(
+    `/api/payroll/periods/${periodId}/initialize`,
+    { method: "POST", body: {} }
+  );
+  return data.entries;
+}
+
+export async function fetchSalaryAuditHistory(filters?: {
+  entryId?: number;
+  workerId?: number;
+  periodId?: number;
+}): Promise<SalaryAuditHistoryRecord[]> {
+  const sp = new URLSearchParams();
+  if (filters?.entryId) sp.set("entryId", String(filters.entryId));
+  if (filters?.workerId) sp.set("workerId", String(filters.workerId));
+  if (filters?.periodId) sp.set("periodId", String(filters.periodId));
+  const qs = sp.toString();
+  const data = await apiRequest<{ history: SalaryAuditHistoryRecord[] }>(
+    `/api/payroll/salary-history${qs ? `?${qs}` : ""}`
+  );
+  return data.history;
+}
+
 export async function approvePayrollEntry(
   entryId: number,
   expectedVersion: number
@@ -620,12 +748,39 @@ export async function recordSalaryPayment(
   );
 }
 
+export async function updateApprovedSalary(
+  entryId: number,
+  body: UpdateApprovedSalaryPayload
+): Promise<PayrollEntryRecord> {
+  const data = await apiRequest<{ entry: PayrollEntryRecord }>(
+    `/api/payroll/entries/${entryId}/approved-salary`,
+    { method: "PUT", body }
+  );
+  return data.entry;
+}
+
 export async function fetchWorkerAdvances(
-  workerId?: number
+  filters?:
+    | {
+        workerId?: number;
+        userId?: string;
+        dateFrom?: string;
+        dateTo?: string;
+      }
+    | number
 ): Promise<WorkerAdvanceRecord[]> {
-  const qs = workerId ? `?workerId=${workerId}` : "";
+  const sp = new URLSearchParams();
+  if (typeof filters === "number") {
+    sp.set("workerId", String(filters));
+  } else if (filters) {
+    if (filters.workerId) sp.set("workerId", String(filters.workerId));
+    if (filters.userId) sp.set("userId", filters.userId);
+    if (filters.dateFrom) sp.set("dateFrom", filters.dateFrom);
+    if (filters.dateTo) sp.set("dateTo", filters.dateTo);
+  }
+  const qs = sp.toString();
   const data = await apiRequest<{ advances: WorkerAdvanceRecord[] }>(
-    `/api/payroll/advances${qs}`
+    `/api/payroll/advances${qs ? `?${qs}` : ""}`
   );
   return data.advances;
 }
@@ -644,20 +799,69 @@ export async function recordWorkerAdvance(body: {
   return data.advance;
 }
 
-export async function fetchSalaryPayments(): Promise<SalaryPaymentRecord[]> {
+export async function fetchSalaryPayments(filters?: {
+  periodId?: number;
+  workerId?: number;
+}): Promise<SalaryPaymentRecord[]> {
+  const sp = new URLSearchParams();
+  if (filters?.periodId) sp.set("periodId", String(filters.periodId));
+  if (filters?.workerId) sp.set("workerId", String(filters.workerId));
+  const qs = sp.toString();
   const data = await apiRequest<{ payments: SalaryPaymentRecord[] }>(
-    "/api/payroll/payments"
+    `/api/payroll/payments${qs ? `?${qs}` : ""}`
   );
   return data.payments;
 }
 
+export async function adjustSalaryPayment(
+  paymentId: number,
+  body: AdjustSalaryPaymentPayload
+): Promise<{
+  adjustment: SalaryPaymentAdjustmentRecord;
+  entry: PayrollEntryRecord;
+  replayed: boolean;
+}> {
+  return apiRequest<{
+    adjustment: SalaryPaymentAdjustmentRecord;
+    entry: PayrollEntryRecord;
+    replayed: boolean;
+  }>(`/api/payroll/payments/${paymentId}/adjust`, {
+    method: "POST",
+    body,
+  });
+}
+
+export async function fetchSalaryPaymentAdjustments(
+  paymentId: number
+): Promise<SalaryPaymentAdjustmentRecord[]> {
+  const data = await apiRequest<{
+    paymentId: number;
+    adjustments: SalaryPaymentAdjustmentRecord[];
+  }>(`/api/payroll/payments/${paymentId}/adjustments`);
+  return data.adjustments;
+}
+
 export async function fetchOperationalExpenses(
-  dateFrom?: string,
+  filters?:
+    | {
+        category?: string;
+        userId?: string;
+        dateFrom?: string;
+        dateTo?: string;
+      }
+    | string,
   dateTo?: string
 ): Promise<OperationalExpenseRecord[]> {
   const sp = new URLSearchParams();
-  if (dateFrom) sp.set("dateFrom", dateFrom);
-  if (dateTo) sp.set("dateTo", dateTo);
+  if (typeof filters === "string") {
+    sp.set("dateFrom", filters);
+    if (dateTo) sp.set("dateTo", dateTo);
+  } else if (filters) {
+    if (filters.category) sp.set("category", filters.category);
+    if (filters.userId) sp.set("userId", filters.userId);
+    if (filters.dateFrom) sp.set("dateFrom", filters.dateFrom);
+    if (filters.dateTo) sp.set("dateTo", filters.dateTo);
+  }
   const qs = sp.toString();
   const data = await apiRequest<{ expenses: OperationalExpenseRecord[] }>(
     `/api/expenses${qs ? `?${qs}` : ""}`

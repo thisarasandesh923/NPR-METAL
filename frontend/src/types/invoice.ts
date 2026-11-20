@@ -19,7 +19,20 @@ export type IconName =
   | "lock"
   | "check";
 
-export type MaterialName = '3/4"' | "Dust" | "6×9" | "ABC";
+export type MaterialName =
+  | "3/4 Metal"
+  | "Dust"
+  | "Chip"
+  | "6×9 (Aggregate)"
+  | "2×2"
+  | '1" (Inch)'
+  | "1 1/2"
+  | "ABC"
+  | "SubBase"
+  | "Mix (Dust & Chip)"
+  | "Quarry Muck"
+  | '3/4"'
+  | "6×9";
 
 export interface MaterialRow {
   id: number;

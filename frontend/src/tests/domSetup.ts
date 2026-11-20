@@ -42,3 +42,8 @@ Object.defineProperty(globalThis, "localStorage", {
   configurable: true,
   writable: true,
 });
+Object.defineProperty(globalThis, "sessionStorage", {
+  value: testDom.window.sessionStorage,
+  configurable: true,
+  writable: true,
+});

@@ -4,6 +4,9 @@ import { testDom } from "./domSetup.ts";
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import App from "../App.tsx";
+import { AuthProvider } from "../context/AuthContext.tsx";
+import { LanguageProvider } from "../i18n/LanguageContext.tsx";
+import { InvoiceDetailPage } from "../features/invoices/components/InvoiceDetailPage.tsx";
 import { formatColomboDateTime, formatLkr } from "../utils/formatters.ts";
 import type { InvoiceDetail, MaterialCatalogItem } from "../types/billing.ts";
 
@@ -274,6 +277,7 @@ describe("Phase 4 Billing MVP — Frontend Invoice, Payment, A5 Print & Owner Vi
     // Verify confirmed persisted view & A5 print section render
     assert.match(container.textContent ?? "", /NPR-INV-000042/);
     assert.match(container.textContent ?? "", /Print A5 Invoice/);
+    assert.match(container.textContent ?? "", /Print 80mm Receipt/);
     assert.match(container.textContent ?? "", /NPR METAL CRUSHER/);
     assert.match(container.textContent ?? "", /NPR-REC-000011/);
 
@@ -378,5 +382,177 @@ describe("Phase 4 Billing MVP — Frontend Invoice, Payment, A5 Print & Owner Vi
     assert.match(container.textContent ?? "", /Rs\. 35,000\.00/);
     assert.match(container.textContent ?? "", /NPR-INV-000099/);
     assert.match(container.textContent ?? "", /Kurunegala Hardware/);
+  });
+
+  it("supports dual print layouts (A5 and 80mm POS Thermal) with correct data and non-interfering styles", async () => {
+    const mockInvoice: InvoiceDetail = {
+      id: 88,
+      invoiceNumber: "NPR-INV-000088",
+      customerId: 9,
+      customerName: "Sunil Bandara Constructions",
+      customerPhone: "0771234567",
+      customerLocation: "Ibbagamuwa Quarry Road",
+      hasTransport: true,
+      transportFee: "5000.00",
+      subtotal: "48000.00",
+      grandTotal: "53000.00",
+      effectiveGrandTotal: "53000.00",
+      paidAmount: "25000.00",
+      balanceDue: "28000.00",
+      paymentStatus: "PARTIALLY_PAID",
+      invoiceStatus: "ISSUED",
+      issuedByUserId: "c-1",
+      issuedByName: "Nimal Jayawardena",
+      issuedAt: "2026-11-15T10:30:00.000Z",
+      businessDate: "2026-11-15",
+      items: [
+        {
+          id: 1,
+          materialId: 1,
+          materialName: "3/4 Metal",
+          quantity: "4.000",
+          unitPrice: "12000.00",
+          lineTotal: "48000.00",
+        },
+      ],
+      payments: [
+        {
+          id: 101,
+          receiptNumber: "NPR-RCP-000101",
+          invoiceId: 88,
+          cashierUserId: "c-1",
+          cashierName: "Nimal Jayawardena",
+          amount: "25000.00",
+          paymentMethod: "CASH",
+          notes: "Initial advance",
+          createdAt: "2026-11-15T10:30:00.000Z",
+        },
+      ],
+      adjustments: [],
+    };
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url === "/api/auth/me") {
+        return jsonResponse(200, {
+          success: true,
+          data: {
+            user: {
+              id: "c-1",
+              username: "cashier1",
+              fullName: "Nimal Jayawardena",
+              role: "CASHIER",
+            },
+          },
+        });
+      }
+      return jsonResponse(404, { success: false, error: { message: "Not found" } });
+    }) as typeof globalThis.fetch;
+
+    const printCalls: string[] = [];
+    (window as any).print = () => {
+      printCalls.push(document.body.getAttribute("data-print-format") ?? "default");
+    };
+
+    root = createRoot(container);
+    await act(async () => {
+      root!.render(
+        React.createElement(
+          AuthProvider,
+          null,
+          React.createElement(
+            LanguageProvider,
+            null,
+            React.createElement(InvoiceDetailPage, {
+              initialInvoice: mockInvoice,
+              onBack: () => {},
+            })
+          )
+        )
+      );
+    });
+    await act(async () => {
+      await flush();
+      await flush();
+    });
+
+    // 1. Verify presence of both print buttons
+    const a5Btn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Print A5 Invoice")
+    );
+    const thermalBtn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Print 80mm Receipt")
+    );
+    assert.ok(a5Btn, "Expected 'Print A5 Invoice' button");
+    assert.ok(thermalBtn, "Expected 'Print 80mm Receipt' button");
+
+    // 2. Verify thermal receipt layout elements
+    const thermalSheet = container.querySelector(".print-thermal-sheet");
+    assert.ok(thermalSheet, "Expected .print-thermal-sheet element");
+    const thermalText = thermalSheet.textContent ?? "";
+
+    assert.match(thermalText, /NPR METAL CRUSHER/);
+    assert.match(thermalText, /Seenimodara, Sri Lanka/);
+    assert.match(thermalText, /Proprietor: Nalaka Ranasinghe/);
+    assert.match(thermalText, /NPR-INV-000088/);
+    assert.match(thermalText, /Sunil Bandara Constructions/);
+    assert.match(thermalText, /0771234567/);
+    assert.match(thermalText, /Ibbagamuwa Quarry Road/);
+    assert.match(thermalText, /3\/4 Metal/);
+    assert.match(thermalText, /4\.000 m³/);
+    assert.match(thermalText, /48,000\.00/);
+    assert.match(thermalText, /Rs\. 5,000\.00/);
+    assert.match(thermalText, /Rs\. 53,000\.00/);
+    assert.match(thermalText, /Rs\. 25,000\.00/);
+    assert.match(thermalText, /Rs\. 28,000\.00/);
+    assert.match(thermalText, /PARTIAL/);
+    assert.match(thermalText, /NPR-RCP-000101/);
+    assert.match(thermalText, /Thank you for your business!/);
+    assert.match(thermalText, /\*\*\* END OF RECEIPT \*\*\*/);
+
+    // Verify A5 sheet branding
+    const a5Sheet = container.querySelector(".print-a5-sheet");
+    assert.ok(a5Sheet, "Expected .print-a5-sheet element");
+    const a5Text = a5Sheet.textContent ?? "";
+    assert.match(a5Text, /NPR METAL CRUSHER/);
+    assert.match(a5Text, /Seenimodara, Sri Lanka/);
+    assert.match(a5Text, /Proprietor: Nalaka Ranasinghe/);
+
+    // 3. Test triggering 80mm Thermal Receipt printing
+    await act(async () => {
+      thermalBtn.click();
+    });
+    assert.equal(printCalls.length, 1);
+    assert.equal(printCalls[0], "thermal80");
+    assert.equal(document.body.getAttribute("data-print-format"), "thermal80");
+
+    const pageStyleEl = document.getElementById("npr-print-page-style");
+    assert.ok(pageStyleEl);
+    assert.match(pageStyleEl.textContent ?? "", /size: 80mm auto/);
+
+    // Simulate afterprint event
+    await act(async () => {
+      window.dispatchEvent(new window.Event("afterprint"));
+    });
+    assert.equal(document.body.getAttribute("data-print-format"), null);
+    assert.equal(document.getElementById("npr-print-page-style"), null);
+
+    // 4. Test triggering A5 Invoice printing
+    await act(async () => {
+      a5Btn.click();
+    });
+    assert.equal(printCalls.length, 2);
+    assert.equal(printCalls[1], "a5");
+    assert.equal(document.body.getAttribute("data-print-format"), "a5");
+
+    const a5StyleEl = document.getElementById("npr-print-page-style");
+    assert.ok(a5StyleEl);
+    assert.match(a5StyleEl.textContent ?? "", /size: A5 portrait/);
+
+    await act(async () => {
+      window.dispatchEvent(new window.Event("afterprint"));
+    });
+    assert.equal(document.body.getAttribute("data-print-format"), null);
+    assert.equal(document.getElementById("npr-print-page-style"), null);
   });
 });

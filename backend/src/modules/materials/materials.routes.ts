@@ -25,7 +25,7 @@ export function createMaterialsRouter(
   router.put(
     "/:id/price",
     requireAuth,
-    requireRole("OWNER"),
+    requireRole("OWNER", "CASHIER"),
     controller.updatePrice
   );
 

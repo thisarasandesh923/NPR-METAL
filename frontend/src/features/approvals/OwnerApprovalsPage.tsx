@@ -41,7 +41,13 @@ export function OwnerApprovalsPage() {
     setError(null);
     try {
       const pending = await fetchPendingApprovals();
-      setData(pending);
+      setData({
+        attendance: Array.isArray(pending?.attendance) ? pending.attendance : [],
+        machineLogs: Array.isArray(pending?.machineLogs) ? pending.machineLogs : [],
+        productionLogs: Array.isArray(pending?.productionLogs)
+          ? pending.productionLogs
+          : [],
+      });
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -123,10 +129,16 @@ export function OwnerApprovalsPage() {
     }
   }
 
+  const attendance = Array.isArray(data?.attendance) ? data.attendance : [];
+  const machineLogs = Array.isArray(data?.machineLogs) ? data.machineLogs : [];
+  const productionLogs = Array.isArray(data?.productionLogs)
+    ? data.productionLogs
+    : [];
+
   const totalPending =
-    data.attendance.length +
-    data.machineLogs.length +
-    data.productionLogs.length;
+    attendance.length +
+    machineLogs.length +
+    productionLogs.length;
 
   return (
     <div className="mx-auto max-w-[1400px] p-4 md:p-8 lg:p-10">
@@ -151,7 +163,7 @@ export function OwnerApprovalsPage() {
         </button>
       </div>
 
-      {error && (
+      {error && totalPending > 0 && (
         <div role="alert" className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
           {error}
         </div>
@@ -166,6 +178,22 @@ export function OwnerApprovalsPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
           Loading submitted records...
         </div>
+      ) : error && totalPending === 0 ? (
+        <div className="rounded-2xl border border-rose-200 bg-white p-10 text-center shadow-sm">
+          <p className="text-base font-extrabold text-rose-700">
+            Failed to Load Approvals Queue
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadPending()}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#092547] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#124f8c]"
+          >
+            Retry Connection
+          </button>
+        </div>
       ) : totalPending === 0 ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-10 text-center">
           <p className="text-base font-extrabold text-emerald-900">
@@ -178,13 +206,13 @@ export function OwnerApprovalsPage() {
       ) : (
         <div className="space-y-8">
           {/* Worker Attendance Submissions */}
-          {data.attendance.length > 0 && (
+          {attendance.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-600">
-                Worker Attendance ({data.attendance.length})
+                Worker Attendance ({attendance.length})
               </h2>
               <div className="grid gap-3 md:grid-cols-2">
-                {data.attendance.map((item) => (
+                {attendance.map((item) => (
                   <article
                     key={item.id}
                     className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -255,13 +283,13 @@ export function OwnerApprovalsPage() {
           )}
 
           {/* Machine Work Logs */}
-          {data.machineLogs.length > 0 && (
+          {machineLogs.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-600">
-                Machine Operating Logs ({data.machineLogs.length})
+                Machine Operating Logs ({machineLogs.length})
               </h2>
               <div className="grid gap-3 md:grid-cols-2">
-                {data.machineLogs.map((item) => (
+                {machineLogs.map((item) => (
                   <article
                     key={item.id}
                     className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -332,13 +360,13 @@ export function OwnerApprovalsPage() {
           )}
 
           {/* Production Logs */}
-          {data.productionLogs.length > 0 && (
+          {productionLogs.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-600">
-                Crushed Metal Production ({data.productionLogs.length})
+                Crushed Metal Production ({productionLogs.length})
               </h2>
               <div className="grid gap-3 md:grid-cols-2">
-                {data.productionLogs.map((item) => (
+                {productionLogs.map((item) => (
                   <article
                     key={item.id}
                     className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"

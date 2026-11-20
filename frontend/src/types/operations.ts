@@ -14,8 +14,12 @@ export interface MaterialPriceHistoryRecord {
   materialName: string;
   oldPrice: string;
   newPrice: string;
-  changedByOwnerId: string;
-  changedByOwnerName: string;
+  changedByUserId: string;
+  changedByUsername?: string;
+  changedByName: string;
+  changedByRole?: string;
+  changedByOwnerId?: string;
+  changedByOwnerName?: string;
   reason: string;
   effectiveAt: string;
 }
@@ -162,8 +166,32 @@ export interface CompensationProfileRecord {
   overtimeHourlyRate: string | null;
   effectiveFrom: string;
   notes: string | null;
+  updatedByUserId?: string;
+  updatedByUsername?: string;
+  updatedByName?: string;
+  updatedByRole?: string;
   version: number;
   updatedAt: string;
+}
+
+export interface CompensationHistoryRecord {
+  id: number;
+  workerId: number;
+  workerCode: string;
+  workerName: string;
+  oldPayArrangement: PayArrangement | null;
+  newPayArrangement: PayArrangement;
+  oldBaseRate: string | null;
+  newBaseRate: string | null;
+  oldOvertimeHourlyRate: string | null;
+  newOvertimeHourlyRate: string | null;
+  changedByUserId: string;
+  changedByUsername: string;
+  changedByName: string;
+  changedByRole: string;
+  reason: string;
+  effectiveFrom: string;
+  createdAt: string;
 }
 
 export interface PayrollPeriodRecord {
@@ -174,6 +202,15 @@ export interface PayrollPeriodRecord {
   status: "DRAFT" | "APPROVED" | "CLOSED";
   notes: string | null;
   version: number;
+  createdByUserId?: string;
+  createdByUsername?: string;
+  createdByName?: string;
+  createdByRole?: string;
+  approvedByUserId?: string;
+  approvedByUsername?: string;
+  approvedByName?: string;
+  approvedByRole?: string;
+  approvedAt?: string | null;
   createdAt: string;
 }
 
@@ -213,7 +250,11 @@ export interface WorkerAdvanceRecord {
   advanceDate: string;
   amount: string;
   reason: string;
-  authorizedByOwnerName: string;
+  authorizedByUserId?: string;
+  authorizedByUsername?: string;
+  authorizedByName?: string;
+  authorizedByRole?: string;
+  authorizedByOwnerName?: string;
   createdAt: string;
 }
 
@@ -226,9 +267,13 @@ export interface SalaryPaymentRecord {
   workerName: string;
   paymentDate: string;
   amount: string;
+  effectiveAmount?: string;
   paymentMethod: "CASH" | "BANK_TRANSFER";
   referenceNote: string | null;
-  paidByOwnerName: string;
+  paidByOwnerId?: string;
+  paidByOwnerUsername?: string;
+  paidByOwnerName?: string;
+  paidByOwnerRole?: string;
   createdAt: string;
 }
 
@@ -239,7 +284,11 @@ export interface OperationalExpenseRecord {
   category: string;
   description: string;
   amount: string;
-  recordedByOwnerName: string;
+  recordedByUserId?: string;
+  recordedByUsername?: string;
+  recordedByName?: string;
+  recordedByRole?: string;
+  recordedByOwnerName?: string;
   createdAt: string;
 }
 
@@ -320,4 +369,69 @@ export type GeneralExportType =
   | "summary";
 
 export type ReportExportFormat = "csv" | "xlsx" | "pdf";
+
+export interface UpdateManualSalaryPayload {
+  expectedVersion: number;
+  grossSalary: string | number;
+  reason: string;
+  notes?: string | null;
+}
+
+export interface SalaryAuditHistoryRecord {
+  id: number;
+  payrollEntryId: number;
+  workerId: number;
+  workerCode?: string;
+  workerName?: string;
+  periodId: number;
+  periodLabel?: string;
+  action: string;
+  previousGrossSalary: string | null;
+  newGrossSalary: string | null;
+  applicableAdvances: string | null;
+  calculatedNetPayable: string | null;
+  excessAdvances: string | null;
+  reason: string;
+  notes?: string | null;
+  actorUserId: string;
+  actorUsername: string;
+  actorRole: string;
+  createdAt: string;
+}
+
+export interface UpdateApprovedSalaryPayload {
+  expectedVersion: number;
+  newGrossSalary: string | number;
+  reason: string;
+  notes?: string | null;
+}
+
+export type SalaryAdjustmentType = "VOID" | "AMOUNT_CORRECTION";
+
+export interface SalaryPaymentAdjustmentRecord {
+  id: number;
+  adjustmentNumber: string;
+  salaryPaymentId: number;
+  payrollEntryId: number;
+  workerId: number;
+  workerName: string;
+  adjustmentType: SalaryAdjustmentType;
+  priorEffectiveAmount: string;
+  correctedAmount: string;
+  adjustmentDelta: string;
+  authorizedByUserId: string;
+  authorizedByUsername?: string;
+  authorizedByName?: string;
+  authorizedByRole?: string;
+  reason: string;
+  createdAt: string;
+}
+
+export interface AdjustSalaryPaymentPayload {
+  adjustmentType: SalaryAdjustmentType;
+  correctedAmount?: string | number;
+  expectedPriorAmount?: string | number;
+  reason: string;
+  idempotencyKey: string;
+}
 

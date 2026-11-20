@@ -111,9 +111,13 @@ export function MaterialItemsSection({
                     </div>
                   </td>
                   <td>
-                    <div className="relative w-48">
+                    <div className="table-control locked-price flex w-44 items-center gap-1.5 px-3">
+                      <span className="shrink-0 select-none text-xs font-bold text-slate-500">
+                        Rs.
+                      </span>
                       <input
-                        className="table-control locked-price w-full pl-11"
+                        type="text"
+                        className="w-full min-w-0 cursor-default bg-transparent text-xs font-extrabold text-[#092547] outline-none"
                         value={
                           mat
                             ? formatLkr(mat.currentUnitPrice).replace("Rs. ", "")
@@ -122,12 +126,9 @@ export function MaterialItemsSection({
                         readOnly
                         aria-label={`${mat?.name ?? "Material"} unit price`}
                       />
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        Rs.
-                      </span>
                       <Icon
                         name="lock"
-                        className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+                        className="h-3.5 w-3.5 shrink-0 text-slate-400"
                       />
                     </div>
                   </td>

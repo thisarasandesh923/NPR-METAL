@@ -20,6 +20,7 @@ const loginRequestSchema = z.object({
     .string({ error: "Password is required." })
     .min(1, "Password is required.")
     .max(200, "Password exceeds maximum length."),
+  portal: z.enum(["OWNER", "CASHIER"]).optional(),
 });
 
 export class AuthController {
@@ -47,6 +48,7 @@ export class AuthController {
       ipAddress,
       userAgent,
       existingSessionToken,
+      portal: parsed.data.portal,
     });
 
     res.setHeader(
