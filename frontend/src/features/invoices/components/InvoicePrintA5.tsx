@@ -86,6 +86,14 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
                 {invoice.hasTransport ? "With Transport (සහිතයි)" : "Customer Pickup (රහිතයි)"}
               </strong>
             </p>
+            {invoice.vehicleCategory && (
+              <p className="text-[10px] text-slate-700">
+                Rate / මිල කාණ්ඩය:{" "}
+                <strong>
+                  {invoice.vehicleCategory === "TRACTOR" ? "Tractor (ට්‍රැක්ටර්)" : "Tipper (ටිපර්)"}
+                </strong>
+              </p>
+            )}
           </div>
         </div>
 
@@ -94,25 +102,32 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
             <tr className="border-b border-slate-400 bg-slate-100 text-left">
               <th className="px-2 py-1.5 font-bold">#</th>
               <th className="px-2 py-1.5 font-bold">Material / ද්‍රව්‍යය</th>
-              <th className="px-2 py-1.5 text-right font-bold">Qty / ප්‍රමාණය (m³)</th>
+              <th className="px-2 py-1.5 text-right font-bold">
+                Qty / ප්‍රමාණය ({invoice.unitSnapshot || invoice.items[0]?.unitSnapshot || "m³"})
+              </th>
               <th className="px-2 py-1.5 text-right font-bold">Unit Price / ඒකක මිල</th>
               <th className="px-2 py-1.5 text-right font-bold">Total / මුළු මුදල</th>
             </tr>
           </thead>
           <tbody>
-            {invoice.items.map((item, idx) => (
-              <tr key={item.id} className="border-b border-slate-200">
-                <td className="px-2 py-1.5">{idx + 1}</td>
-                <td className="px-2 py-1.5 font-bold">{item.materialName}</td>
-                <td className="px-2 py-1.5 text-right">{item.quantity} m³</td>
-                <td className="px-2 py-1.5 text-right">
-                  {formatLkr(item.unitPrice)}
-                </td>
-                <td className="px-2 py-1.5 text-right font-bold">
-                  {formatLkr(item.lineTotal)}
-                </td>
-              </tr>
-            ))}
+            {invoice.items.map((item, idx) => {
+              const itemUnit = item.unitSnapshot || invoice.unitSnapshot || "m³";
+              return (
+                <tr key={item.id} className="border-b border-slate-200">
+                  <td className="px-2 py-1.5">{idx + 1}</td>
+                  <td className="px-2 py-1.5 font-bold">{item.materialName}</td>
+                  <td className="px-2 py-1.5 text-right">
+                    {item.quantity} {itemUnit}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    {formatLkr(item.unitPrice)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-bold">
+                    {formatLkr(item.lineTotal)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 

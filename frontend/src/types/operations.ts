@@ -12,7 +12,7 @@ export interface MaterialPriceHistoryRecord {
   materialId: number;
   materialCode: string;
   materialName: string;
-  oldPrice: string;
+  oldPrice: string | null;
   newPrice: string;
   changedByUserId: string;
   changedByUsername?: string;
@@ -22,6 +22,9 @@ export interface MaterialPriceHistoryRecord {
   changedByOwnerName?: string;
   reason: string;
   effectiveAt: string;
+  vehicleCategory?: import("./billing.ts").VehicleCategory;
+  oldVersion?: number | null;
+  newVersion?: number;
 }
 
 export interface WorkerRecord {

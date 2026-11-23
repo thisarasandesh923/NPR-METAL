@@ -68,8 +68,34 @@ describe("Phase 4 Billing MVP — Frontend Invoice, Payment, A5 Print & Owner Vi
   it("completes CASHIER invoice creation from live materials, A5 print rendering, and subsequent payment recording", async () => {
     localStorage.setItem("npr_preferred_language", "en");
     const materials: MaterialCatalogItem[] = [
-      { id: 1, code: "3/4", name: '3/4"', unit: "m³", currentUnitPrice: "12000.00", isActive: true },
-      { id: 2, code: "DUST", name: "Dust", unit: "m³", currentUnitPrice: "8500.00", isActive: true },
+      {
+        id: 1,
+        code: "3/4",
+        name: '3/4"',
+        unit: "ft³",
+        currentUnitPrice: "12000.00",
+        tractorPricePerFt3: "12000.00",
+        tipperPricePerFt3: "12500.00",
+        vehiclePrices: {
+          TRACTOR: { vehicleCategory: "TRACTOR", pricePerFt3: "12000.00", version: 1, updatedAt: new Date().toISOString() },
+          TIPPER: { vehicleCategory: "TIPPER", pricePerFt3: "12500.00", version: 1, updatedAt: new Date().toISOString() },
+        },
+        isActive: true,
+      },
+      {
+        id: 2,
+        code: "DUST",
+        name: "Dust",
+        unit: "ft³",
+        currentUnitPrice: "8500.00",
+        tractorPricePerFt3: "8500.00",
+        tipperPricePerFt3: "9000.00",
+        vehiclePrices: {
+          TRACTOR: { vehicleCategory: "TRACTOR", pricePerFt3: "8500.00", version: 1, updatedAt: new Date().toISOString() },
+          TIPPER: { vehicleCategory: "TIPPER", pricePerFt3: "9000.00", version: 1, updatedAt: new Date().toISOString() },
+        },
+        isActive: true,
+      },
     ];
 
     let savedInvoice: InvoiceDetail | null = null;
@@ -242,7 +268,7 @@ describe("Phase 4 Billing MVP — Frontend Invoice, Payment, A5 Print & Owner Vi
     );
 
     const qtyInput = container.querySelector(
-      "input[aria-label='Quantity in cubic meters for item 1']"
+      "input[aria-label='Quantity in cubic feet for item 1']"
     ) as HTMLInputElement;
     await setInputValue(qtyInput, "2.000");
 
@@ -273,6 +299,7 @@ describe("Phase 4 Billing MVP — Frontend Invoice, Payment, A5 Print & Owner Vi
     assert.ok(captured.issueBody);
     assert.equal(typeof captured.issueBody.idempotencyKey, "string");
     assert.ok((captured.issueBody.idempotencyKey as string).length >= 16);
+    assert.equal(captured.issueBody.vehicleCategory, "TRACTOR");
 
     // Verify confirmed persisted view & A5 print section render
     assert.match(container.textContent ?? "", /NPR-INV-000042/);
@@ -491,9 +518,20 @@ describe("Phase 4 Billing MVP — Frontend Invoice, Payment, A5 Print & Owner Vi
     assert.ok(thermalSheet, "Expected .print-thermal-sheet element");
     const thermalText = thermalSheet.textContent ?? "";
 
-    assert.match(thermalText, /NPR METAL CRUSHER/);
-    assert.match(thermalText, /Seenimodara, Sri Lanka/);
-    assert.match(thermalText, /Proprietor: Nalaka Ranasinghe/);
+    assert.match(thermalText, /N\.?\s*P\.?\s*R\.?\s*METAL CRUSHER/);
+    assert.match(thermalText, /Seenimodara/);
+    assert.match(thermalText, /071 4470495/);
+    assert.match(thermalText, /077 6159861/);
+    assert.match(thermalText, /047 3129921/);
+    assert.match(thermalText, /H\/6\/3134/);
+    assert.match(thermalText, /Customer \/ පාරිභෝගිකයා/);
+    assert.match(thermalText, /Location \/ ස්ථානය/);
+    assert.match(thermalText, /T\.P \/ දුරකථන/);
+    assert.match(thermalText, /Invoice \/ බිල්පත/);
+    assert.match(thermalText, /Date \/ දිනය/);
+    assert.match(thermalText, /Time \/ වේලාව/);
+    assert.match(thermalText, /Total \/ එකතුව/);
+    assert.match(thermalText, /Balance \/ ඉතිරිය/);
     assert.match(thermalText, /NPR-INV-000088/);
     assert.match(thermalText, /Sunil Bandara Constructions/);
     assert.match(thermalText, /0771234567/);
@@ -506,9 +544,14 @@ describe("Phase 4 Billing MVP — Frontend Invoice, Payment, A5 Print & Owner Vi
     assert.match(thermalText, /Rs\. 25,000\.00/);
     assert.match(thermalText, /Rs\. 28,000\.00/);
     assert.match(thermalText, /PARTIAL/);
-    assert.match(thermalText, /NPR-RCP-000101/);
-    assert.match(thermalText, /Thank you for your business!/);
-    assert.match(thermalText, /\*\*\* END OF RECEIPT \*\*\*/);
+    assert.match(thermalText, /Thank You!/);
+    assert.match(thermalText, /ස්තූතියි!/);
+
+    // Verify unnecessary metadata was removed from 80mm thermal receipt
+    assert.doesNotMatch(thermalText, /Proprietor/);
+    assert.doesNotMatch(thermalText, /NPR-RCP/);
+    assert.doesNotMatch(thermalText, /Rate Category/);
+    assert.doesNotMatch(thermalText, /\*\*\* END OF RECEIPT/);
 
     // Verify A5 sheet branding
     const a5Sheet = container.querySelector(".print-a5-sheet");

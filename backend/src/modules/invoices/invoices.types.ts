@@ -1,3 +1,7 @@
+import type { VehicleCategory } from "../materials/materials.types.js";
+
+export type { VehicleCategory };
+
 export type InvoiceStatus = "ISSUED" | "CANCELLED";
 
 export type PaymentStatus =
@@ -14,6 +18,8 @@ export interface InvoiceItemDto {
   quantity: string;
   unitPrice: string;
   lineTotal: string;
+  unitSnapshot?: string;
+  vehicleCategorySnapshot?: VehicleCategory | null;
 }
 
 export interface InvoicePaymentDto {
@@ -48,6 +54,8 @@ export interface InvoiceSummaryDto {
   issuedByName: string;
   issuedAt: string;
   businessDate: string;
+  vehicleCategory?: VehicleCategory | null;
+  unitSnapshot?: string;
 }
 
 export interface InvoicePaymentAdjustmentDto {
@@ -82,6 +90,7 @@ export interface CreateInvoiceInput {
     location: string;
     notes?: string | null;
   };
+  vehicleCategory: VehicleCategory;
   items: CreateInvoiceItemInput[];
   hasTransport: boolean;
   transportFee: string | number;
@@ -89,4 +98,3 @@ export interface CreateInvoiceInput {
   initialPaymentNotes?: string | null;
   idempotencyKey: string;
 }
-

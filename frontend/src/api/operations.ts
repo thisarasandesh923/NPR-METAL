@@ -1,5 +1,9 @@
 import { ApiError, apiRequest } from "./client.ts";
-import type { InvoiceDetail, MaterialCatalogItem } from "../types/billing.ts";
+import type {
+  InvoiceDetail,
+  MaterialCatalogItem,
+  VehicleCategory,
+} from "../types/billing.ts";
 import type {
   AdjustSalaryPaymentPayload,
   AttendanceRecord,
@@ -35,6 +39,7 @@ import type {
 export async function updateMaterialPrice(
   materialId: number,
   body: {
+    vehicleCategory?: VehicleCategory;
     newPrice: string;
     reason: string;
     expectedVersion: number;
@@ -50,6 +55,7 @@ export async function updateMaterialPrice(
 
 export interface FetchPriceHistoryParams {
   materialId?: number;
+  vehicleCategory?: VehicleCategory | "ALL";
   userId?: string;
   cashierId?: string;
   dateFrom?: string;
@@ -65,6 +71,9 @@ export async function fetchMaterialPriceHistory(
   const searchParams = new URLSearchParams();
   if (normParams.materialId !== undefined) {
     searchParams.set("materialId", String(normParams.materialId));
+  }
+  if (normParams.vehicleCategory) {
+    searchParams.set("vehicleCategory", normParams.vehicleCategory);
   }
   if (normParams.userId) {
     searchParams.set("userId", normParams.userId);
@@ -99,6 +108,9 @@ export async function fetchMaterialPriceHistory(
     changedByOwnerName: r.changedByName,
     reason: r.reason,
     effectiveAt: r.createdAt ?? r.effectiveAt,
+    vehicleCategory: r.vehicleCategory ?? r.vehicle_category ?? undefined,
+    oldVersion: r.oldVersion ?? r.old_version ?? null,
+    newVersion: r.newVersion ?? r.new_version ?? undefined,
   }));
 }
 

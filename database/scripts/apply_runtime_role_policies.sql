@@ -473,4 +473,44 @@ BEGIN
 END
 $$;
 
+-- 7. Conditional Grants & RLS Policies for Migration 015 Objects (Vehicle-based ft³ Pricing)
+DO $$
+BEGIN
+    IF to_regclass('public.material_vehicle_prices') IS NOT NULL THEN
+        GRANT USAGE, SELECT ON SEQUENCE
+            material_vehicle_prices_id_seq,
+            material_vehicle_price_history_id_seq
+        TO npr_app_user;
+
+        GRANT SELECT, INSERT, UPDATE ON material_vehicle_prices TO npr_app_user;
+        GRANT SELECT, INSERT ON material_vehicle_price_history TO npr_app_user;
+
+        DROP POLICY IF EXISTS app_mat_veh_prices_select ON material_vehicle_prices;
+        DROP POLICY IF EXISTS app_mat_veh_prices_insert ON material_vehicle_prices;
+        DROP POLICY IF EXISTS app_mat_veh_prices_update ON material_vehicle_prices;
+
+        CREATE POLICY app_mat_veh_prices_select ON material_vehicle_prices
+            FOR SELECT TO npr_app_user USING (true);
+        CREATE POLICY app_mat_veh_prices_insert ON material_vehicle_prices
+            FOR INSERT TO npr_app_user WITH CHECK (true);
+        CREATE POLICY app_mat_veh_prices_update ON material_vehicle_prices
+            FOR UPDATE TO npr_app_user USING (true) WITH CHECK (true);
+
+        DROP POLICY IF EXISTS app_mat_veh_price_history_select ON material_vehicle_price_history;
+        DROP POLICY IF EXISTS app_mat_veh_price_history_insert ON material_vehicle_price_history;
+
+        CREATE POLICY app_mat_veh_price_history_select ON material_vehicle_price_history
+            FOR SELECT TO npr_app_user USING (true);
+        CREATE POLICY app_mat_veh_price_history_insert ON material_vehicle_price_history
+            FOR INSERT TO npr_app_user
+            WITH CHECK (
+                EXISTS (
+                    SELECT 1 FROM users u
+                    WHERE u.id = changed_by_user_id AND u.role IN ('OWNER', 'CASHIER') AND u.is_active = true
+                )
+            );
+    END IF;
+END
+$$;
+
 COMMIT;

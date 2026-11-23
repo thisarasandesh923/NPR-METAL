@@ -15,7 +15,7 @@ import {
   findCustomerById,
   insertCustomer,
 } from "../customers/customers.repository.js";
-import { findActiveMaterialsByIds } from "../materials/materials.repository.js";
+import { findActiveMaterialsWithVehiclePrices } from "../materials/materials.repository.js";
 import { insertCashPayment } from "../payments/payments.repository.js";
 import {
   acquireIdempotencyLock,
@@ -49,6 +49,7 @@ function computeInvoiceRequestHash(
           notes: input.customer.notes?.trim() ?? null,
         }
       : null,
+    vehicleCategory: input.vehicleCategory ?? null,
     items: input.items.map((item) => ({
       materialId: item.materialId,
       quantity: String(item.quantity).trim(),
@@ -72,7 +73,7 @@ function parsePositiveQuantityMilli(raw: string | number): bigint {
   }
   if (qtyMilli <= 0n || qtyMilli > 100_000_000n) {
     throw new ValidationError(
-      "Quantity must be greater than 0.000 m³ and at most 100,000.000 m³."
+      "Quantity must be greater than 0.000 and at most 100,000.000."
     );
   }
   return qtyMilli;
@@ -123,6 +124,10 @@ export class InvoicesService {
     input: CreateInvoiceInput,
     actor: { userId: string; ipAddress: string }
   ): Promise<{ invoice: InvoiceDetailDto; replayed: boolean }> {
+    if (!input.vehicleCategory || (input.vehicleCategory !== "TRACTOR" && input.vehicleCategory !== "TIPPER")) {
+      throw new ValidationError("Vehicle category (TRACTOR or TIPPER) is required.");
+    }
+
     const transportFeeCents = input.hasTransport
       ? parseMoneyCents(input.transportFee, "Transport fee")
       : (() => {
@@ -216,13 +221,14 @@ export class InvoicesService {
         );
       }
 
-      // Load authoritative server-side material prices
+      // Load authoritative server-side material prices for selected vehicle category
       const uniqueMaterialIds = Array.from(
         new Set(normalizedItems.map((i) => i.materialId))
       );
-      const materialRows = await findActiveMaterialsByIds(
+      const materialRows = await findActiveMaterialsWithVehiclePrices(
         client,
-        uniqueMaterialIds
+        uniqueMaterialIds,
+        input.vehicleCategory
       );
       const materialsById = new Map(materialRows.map((m) => [m.id, m]));
 
@@ -234,11 +240,21 @@ export class InvoicesService {
             `Material #${item.materialId} is invalid or inactive.`
           );
         }
+        if (mat.price_per_ft3 === null || mat.price_per_ft3 === undefined || mat.price_per_ft3.trim() === "") {
+          throw new ValidationError(
+            `Material "${mat.name}" does not have an active price configured for ${input.vehicleCategory}. Please set the price before issuing invoices.`
+          );
+        }
         const unitPriceCents = parseScaledDecimal(
-          mat.current_unit_price,
+          mat.price_per_ft3,
           2,
           "Material unit price"
         );
+        if (unitPriceCents < 0n) {
+          throw new ValidationError(
+            `Material "${mat.name}" unit price cannot be negative.`
+          );
+        }
         const lineTotalCents = computeLineTotalCents(
           item.quantityMilli,
           unitPriceCents
@@ -251,6 +267,8 @@ export class InvoicesService {
           quantity: formatScaledDecimal(item.quantityMilli, 3),
           unitPrice: formatScaledDecimal(unitPriceCents, 2),
           lineTotal: formatScaledDecimal(lineTotalCents, 2),
+          unitSnapshot: "ft³",
+          vehicleCategorySnapshot: input.vehicleCategory,
         };
       });
 
@@ -269,6 +287,8 @@ export class InvoicesService {
         hasTransport: input.hasTransport,
         transportFee: formatScaledDecimal(transportFeeCents, 2),
         issuedByUserId: actor.userId,
+        vehicleCategory: input.vehicleCategory,
+        unitSnapshot: "ft³",
       });
 
       for (const line of computedLines) {
@@ -279,6 +299,8 @@ export class InvoicesService {
           quantity: line.quantity,
           unitPrice: line.unitPrice,
           lineTotal: line.lineTotal,
+          unitSnapshot: line.unitSnapshot,
+          vehicleCategorySnapshot: line.vehicleCategorySnapshot,
         });
       }
 
@@ -312,6 +334,8 @@ export class InvoicesService {
         details: {
           invoiceNumber: draft.invoiceNumber,
           customerId: resolvedCustomer.id,
+          vehicleCategory: input.vehicleCategory,
+          unitSnapshot: "ft³",
           grandTotal: formatScaledDecimal(grandTotalCents, 2),
           initialPayment: formatScaledDecimal(initialPaymentCents, 2),
           initialReceiptNumber,
@@ -347,4 +371,3 @@ export class InvoicesService {
     }
   }
 }
-

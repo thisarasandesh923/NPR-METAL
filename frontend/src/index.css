@@ -442,5 +442,8 @@
     background: #ffffff !important;
     page-break-inside: avoid;
     break-inside: avoid;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    box-sizing: border-box !important;
   }
 }

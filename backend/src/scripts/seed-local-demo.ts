@@ -117,6 +117,47 @@ async function main(): Promise<void> {
       materialIds[mat.code] = mRes.rows[0].id;
     }
 
+    // 2b. Vehicle-Specific Material Prices (ft³ Tractor & Tipper) for Demo Testing
+    const vehPricesTable = await client.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'material_vehicle_prices'
+       ) AS exists`
+    );
+    if (vehPricesTable.rows[0]?.exists) {
+      const activeVehiclePrices = [
+        { code: "3/4", tractor: "240.00", tipper: "250.00" },
+        { code: "DUST", tractor: "170.00", tipper: "180.00" },
+        { code: "6X9", tractor: "200.00", tipper: "210.00" },
+        { code: "ABC", tractor: "220.00", tipper: "230.00" },
+      ];
+
+      for (const vp of activeVehiclePrices) {
+        const matId = materialIds[vp.code];
+        if (matId) {
+          await client.query(
+            `INSERT INTO public.material_vehicle_prices (material_id, vehicle_category, price_per_ft3, version)
+             VALUES
+               ($1, 'TRACTOR', $2, 1),
+               ($1, 'TIPPER', $3, 1)
+             ON CONFLICT (material_id, vehicle_category)
+             DO UPDATE SET price_per_ft3 = EXCLUDED.price_per_ft3`,
+            [matId, vp.tractor, vp.tipper]
+          );
+
+          await client.query(
+            `INSERT INTO public.material_vehicle_price_history
+               (material_id, vehicle_category, old_price_per_ft3, new_price_per_ft3, old_version, new_version, changed_by_user_id, reason)
+             VALUES
+               ($1, 'TRACTOR', NULL, $2, NULL, 1, $4, 'Initial demo vehicle pricing configuration'),
+               ($1, 'TIPPER', NULL, $3, NULL, 1, $4, 'Initial demo vehicle pricing configuration')`,
+            [matId, vp.tractor, vp.tipper, ownerId]
+          );
+        }
+      }
+      console.log("[LOCAL DEMO] Seeded vehicle-specific ft³ prices for Tractor & Tipper.");
+    }
+
     // 3. Fictional Workers & Compensation Rules
     const workerIds: Record<string, number> = {};
     for (const w of [
@@ -195,6 +236,41 @@ async function main(): Promise<void> {
         `INSERT INTO public.payments (invoice_id, cashier_user_id, amount, payment_method, idempotency_key, notes)
          VALUES ($1, $2, 20000.00, 'CASH', 'demo-seed-pay-0001', 'Initial advance cash deposit')`,
         [inv1.rows[0].id, cashierId]
+      );
+
+      // Sample 2: New ft³ Tractor Billing Invoice (demonstrates vehicle-specific ft³ pricing workflow)
+      const c2 = await client.query<{ id: number }>(
+        `INSERT INTO public.customers (name, phone, location, notes)
+         VALUES ('Gamage Earthmovers (Demo)', '0770002002', 'Seenimodara', 'Fictional demo client for ft³ testing')
+         RETURNING id`
+      );
+      const inv2 = await client.query<{ id: number }>(
+        `INSERT INTO public.invoices (
+           customer_id, customer_name_snapshot, customer_phone_snapshot, customer_location_snapshot,
+           has_transport, transport_fee, subtotal, grand_total, status, issued_by_user_id,
+           vehicle_category, unit_snapshot
+         ) VALUES ($1, 'Gamage Earthmovers (Demo)', '0770002002', 'Seenimodara',
+                   true, 3500.00, 0.00, 3500.00, 'DRAFT', $2, 'TRACTOR', 'ft³')
+         RETURNING id`,
+        [c2.rows[0].id, cashierId]
+      );
+      await client.query(
+        `INSERT INTO public.invoice_items (
+           invoice_id, material_id, material_name_snapshot, quantity, unit_price, line_total,
+           unit_snapshot, vehicle_category_snapshot
+         ) VALUES ($1, $2, '3/4 Metal', 100.000, 240.00, 24000.00, 'ft³', 'TRACTOR')`,
+        [inv2.rows[0].id, materialIds["3/4"]]
+      );
+      await client.query(
+        `UPDATE public.invoices
+         SET subtotal = 24000.00, grand_total = 27500.00, status = 'ISSUED', issued_at = NOW()
+         WHERE id = $1`,
+        [inv2.rows[0].id]
+      );
+      await client.query(
+        `INSERT INTO public.payments (invoice_id, cashier_user_id, amount, payment_method, idempotency_key, notes)
+         VALUES ($1, $2, 27500.00, 'CASH', 'demo-seed-pay-0002', 'Full cash payment for tractor delivery')`,
+        [inv2.rows[0].id, cashierId]
       );
     }
 

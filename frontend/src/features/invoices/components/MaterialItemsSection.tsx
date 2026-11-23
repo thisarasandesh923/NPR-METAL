@@ -1,7 +1,8 @@
 import { Icon } from "../../../components/ui/Icon.tsx";
 import { useLanguage } from "../../../i18n/LanguageContext.tsx";
-import type { MaterialCatalogItem } from "../../../types/billing.ts";
+import type { MaterialCatalogItem, VehicleCategory } from "../../../types/billing.ts";
 import { formatLkr } from "../../../utils/formatters.ts";
+import { getMaterialVehiclePrice } from "../hooks/useInvoiceForm.ts";
 
 export interface InvoiceLineDraft {
   rowKey: number;
@@ -12,6 +13,9 @@ export interface InvoiceLineDraft {
 interface MaterialItemsSectionProps {
   materials: MaterialCatalogItem[];
   items: InvoiceLineDraft[];
+  vehicleCategory: VehicleCategory;
+  onSelectVehicleCategory: (cat: VehicleCategory) => void;
+  unconfiguredWarning?: string | null;
   onUpdateMaterial: (rowKey: number, materialId: number) => void;
   onUpdateQuantity: (rowKey: number, quantity: string) => void;
   onAddItem: () => void;
@@ -22,6 +26,9 @@ interface MaterialItemsSectionProps {
 export function MaterialItemsSection({
   materials,
   items,
+  vehicleCategory,
+  onSelectVehicleCategory,
+  unconfiguredWarning,
   onUpdateMaterial,
   onUpdateQuantity,
   onAddItem,
@@ -47,6 +54,66 @@ export function MaterialItemsSection({
         </div>
       </div>
 
+      {/* Selling Price Category Selector: TRACTOR vs TIPPER */}
+      <div className="border-b border-slate-100 bg-[#fbfcfd] px-4 py-3 sm:px-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <span className="text-xs font-extrabold uppercase tracking-wider text-[#092547]">
+              {t("sellingPriceCategory")}
+            </span>
+            <p className="text-[11px] text-slate-500">
+              {t("sellingPriceCategorySubtitle")}
+            </p>
+          </div>
+          <div
+            className="inline-flex rounded-xl border border-slate-300 bg-white p-1 shadow-sm"
+            role="radiogroup"
+            aria-label={t("sellingPriceCategory")}
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={vehicleCategory === "TRACTOR"}
+              disabled={disabled}
+              onClick={() => onSelectVehicleCategory("TRACTOR")}
+              className={`flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-bold transition ${
+                vehicleCategory === "TRACTOR"
+                  ? "bg-[#124f8c] text-white shadow-sm"
+                  : "text-slate-600 hover:text-[#092547]"
+              }`}
+            >
+              <span>🚜</span>
+              <span>{t("vehicleCategoryTractor")}</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={vehicleCategory === "TIPPER"}
+              disabled={disabled}
+              onClick={() => onSelectVehicleCategory("TIPPER")}
+              className={`flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-bold transition ${
+                vehicleCategory === "TIPPER"
+                  ? "bg-[#124f8c] text-white shadow-sm"
+                  : "text-slate-600 hover:text-[#092547]"
+              }`}
+            >
+              <span>🚚</span>
+              <span>{t("vehicleCategoryTipper")}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {unconfiguredWarning && (
+        <div
+          role="alert"
+          className="mx-4 mt-4 flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-900 sm:mx-6"
+        >
+          <span className="text-base">⚠️</span>
+          <span>{unconfiguredWarning}</span>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="invoice-items-table w-full min-w-[850px]">
           <thead>
@@ -62,10 +129,17 @@ export function MaterialItemsSection({
           <tbody>
             {items.map((item, index) => {
               const mat = materialsById.get(item.materialId);
-              const unitPrice = mat ? Number(mat.currentUnitPrice) : 0;
+              const unitPriceStr = getMaterialVehiclePrice(mat, vehicleCategory);
+              const isConfigured =
+                unitPriceStr !== null &&
+                unitPriceStr !== undefined &&
+                unitPriceStr.trim() !== "" &&
+                Number.isFinite(Number(unitPriceStr)) &&
+                Number(unitPriceStr) > 0;
+              const unitPrice = isConfigured ? Number(unitPriceStr) : 0;
               const qtyNum = Number(item.quantity);
               const previewTotal =
-                Number.isFinite(qtyNum) && qtyNum > 0
+                isConfigured && Number.isFinite(qtyNum) && qtyNum > 0
                   ? Math.round(qtyNum * unitPrice * 100) / 100
                   : 0;
 
@@ -94,7 +168,8 @@ export function MaterialItemsSection({
                   <td>
                     <div className="relative w-40">
                       <input
-                        aria-label={`Quantity in cubic meters for item ${index + 1}`}
+                        aria-label={`Quantity in cubic feet for item ${index + 1}`}
+                        data-item-quantity={index + 1}
                         disabled={disabled}
                         className="table-control w-full pr-11"
                         type="number"
@@ -106,22 +181,28 @@ export function MaterialItemsSection({
                         }
                       />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        m³
+                        ft³
                       </span>
                     </div>
                   </td>
                   <td>
-                    <div className="table-control locked-price flex w-44 items-center gap-1.5 px-3">
+                    <div
+                      className={`table-control locked-price flex w-44 items-center gap-1.5 px-3 ${
+                        !isConfigured ? "border-amber-400 bg-amber-50/50" : ""
+                      }`}
+                    >
                       <span className="shrink-0 select-none text-xs font-bold text-slate-500">
                         Rs.
                       </span>
                       <input
                         type="text"
-                        className="w-full min-w-0 cursor-default bg-transparent text-xs font-extrabold text-[#092547] outline-none"
+                        className={`w-full min-w-0 cursor-default bg-transparent text-xs font-extrabold outline-none ${
+                          isConfigured ? "text-[#092547]" : "text-amber-800"
+                        }`}
                         value={
-                          mat
-                            ? formatLkr(mat.currentUnitPrice).replace("Rs. ", "")
-                            : "0.00"
+                          isConfigured
+                            ? formatLkr(unitPriceStr).replace("Rs. ", "")
+                            : "Unconfigured"
                         }
                         readOnly
                         aria-label={`${mat?.name ?? "Material"} unit price`}

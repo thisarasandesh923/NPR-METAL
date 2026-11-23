@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "tsx --test src/tests/**/*.test.ts",
-    "test:unit": "tsx --test src/tests/db-config.test.ts src/tests/auth-unit.test.ts src/tests/money-unit.test.ts src/tests/time-exports-unit.test.ts src/tests/materials-catalog-unit.test.ts src/tests/payroll-cashier-disbursement.test.ts src/tests/payroll-owner-corrections.test.ts src/tests/reports-salary-adjustments-unit.test.ts src/tests/password-reset-hardened.test.ts",
+    "test:unit": "tsx --test src/tests/db-config.test.ts src/tests/auth-unit.test.ts src/tests/money-unit.test.ts src/tests/time-exports-unit.test.ts src/tests/materials-catalog-unit.test.ts src/tests/payroll-cashier-disbursement.test.ts src/tests/payroll-owner-corrections.test.ts src/tests/reports-salary-adjustments-unit.test.ts src/tests/password-reset-hardened.test.ts src/tests/vehicle-pricing-unit.test.ts",
+    "test:vehicle-pricing:unit": "tsx --test src/tests/vehicle-pricing-unit.test.ts",
+    "test:vehicle-pricing:integration": "tsx --test src/tests/vehicle-pricing-integration.test.ts",
     "test:auth": "tsx --test src/tests/auth.test.ts",
     "test:billing": "tsx --test src/tests/billing.test.ts",
     "test:operations": "tsx --test src/tests/operations-payroll.test.ts",

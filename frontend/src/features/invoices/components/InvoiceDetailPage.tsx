@@ -192,6 +192,11 @@ export function InvoiceDetailPage({
               <h1 className="text-2xl font-extrabold text-[#092547] md:text-3xl">
                 {invoice.invoiceNumber}
               </h1>
+              {invoice.vehicleCategory && (
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-extrabold text-[#124f8c]">
+                  {invoice.vehicleCategory === "TRACTOR" ? "🚜 Tractor Rate" : "🚚 Tipper Rate"}
+                </span>
+              )}
               <span
                 className={`rounded-full border px-3 py-1 text-xs font-extrabold ${getStatusClasses(invoice.paymentStatus)}`}
               >
@@ -271,6 +276,14 @@ export function InvoiceDetailPage({
                     : t("withoutTransport")}
                 </strong>
               </p>
+              {invoice.vehicleCategory && (
+                <p className="mt-1 text-xs text-slate-600">
+                  Vehicle Category / වාහන වර්ගය:{" "}
+                  <strong>
+                    {invoice.vehicleCategory === "TRACTOR" ? "Tractor (ට්‍රැක්ටර්)" : "Tipper (ටිපර්)"}
+                  </strong>
+                </p>
+              )}
             </section>
 
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -289,8 +302,12 @@ export function InvoiceDetailPage({
                     <tr className="bg-[#f8fafc]">
                       <th>#</th>
                       <th>{t("materialCol")}</th>
-                      <th className="text-right">{t("quantityCol")}</th>
-                      <th className="text-right">{t("unitPriceCol")}</th>
+                      <th className="text-right">
+                        {invoice.unitSnapshot ? `Quantity (${invoice.unitSnapshot})` : t("quantityCol")}
+                      </th>
+                      <th className="text-right">
+                        {invoice.unitSnapshot ? `Unit Price (Rs./${invoice.unitSnapshot})` : t("unitPriceCol")}
+                      </th>
                       <th className="text-right">{t("lineTotalCol")}</th>
                     </tr>
                   </thead>
@@ -302,7 +319,7 @@ export function InvoiceDetailPage({
                           {item.materialName}
                         </td>
                         <td className="text-right font-semibold">
-                          {item.quantity} m³
+                          {item.quantity} {item.unitSnapshot || invoice.unitSnapshot || "m³"}
                         </td>
                         <td className="text-right">{formatLkr(item.unitPrice)}</td>
                         <td className="text-right font-extrabold text-[#092547]">

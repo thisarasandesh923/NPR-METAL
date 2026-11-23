@@ -90,6 +90,13 @@ describe("Billing MVP — Real PostgreSQL 17 + npr_app_user Integration Tests", 
         [mat.code, mat.name, mat.price]
       );
       materialIds[mat.name] = inserted.rows[0].id;
+
+      // Seed both TRACTOR and TIPPER prices in material_vehicle_prices for migration 015 schema
+      await adminPool.query(
+        `INSERT INTO public.material_vehicle_prices (material_id, vehicle_category, price_per_ft3, version)
+         VALUES ($1, 'TRACTOR', $2, 1), ($1, 'TIPPER', $2, 1)`,
+        [inserted.rows[0].id, mat.price]
+      );
     }
 
     const appUrl = new URL(TEST_URL);
@@ -221,6 +228,7 @@ describe("Billing MVP — Real PostgreSQL 17 + npr_app_user Integration Tests", 
     const idemKey = randomUUID();
     const issuePayload = {
       customerId: createdCust.id,
+      vehicleCategory: "TRACTOR",
       items: [
         { materialId: materialIds['3/4"'], quantity: "2.5" },
         { materialId: materialIds["Dust"], quantity: "1.125" },
@@ -302,6 +310,10 @@ describe("Billing MVP — Real PostgreSQL 17 + npr_app_user Integration Tests", 
       "UPDATE public.materials SET current_unit_price = 99999.00 WHERE id = $1",
       [materialIds['3/4"']]
     );
+    await adminPool.query(
+      "UPDATE public.material_vehicle_prices SET price_per_ft3 = 99999.00 WHERE material_id = $1",
+      [materialIds['3/4"']]
+    );
     const reloadRes = await fetch(`${baseUrl}/api/invoices/${inv.id}`, {
       headers: { Cookie: cashierCookie },
     });
@@ -334,6 +346,7 @@ describe("Billing MVP — Real PostgreSQL 17 + npr_app_user Integration Tests", 
           phone: "0719876543",
           location: "Mawathagama",
         },
+        vehicleCategory: "TRACTOR",
         items: [{ materialId: materialIds["6×9"], quantity: "1.000" }],
         hasTransport: false,
         transportFee: "0.00",

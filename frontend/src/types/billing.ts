@@ -1,3 +1,12 @@
+export type VehicleCategory = "TRACTOR" | "TIPPER";
+
+export interface MaterialVehiclePriceDto {
+  vehicleCategory: VehicleCategory;
+  pricePerFt3: string | null;
+  version: number;
+  updatedAt: string;
+}
+
 export interface MaterialCatalogItem {
   id: number;
   code: string;
@@ -7,6 +16,9 @@ export interface MaterialCatalogItem {
   isActive: boolean;
   version?: number;
   updatedAt?: string;
+  vehiclePrices?: Record<VehicleCategory, MaterialVehiclePriceDto | null>;
+  tractorPricePerFt3?: string | null;
+  tipperPricePerFt3?: string | null;
 }
 
 export interface CustomerRecord {
@@ -32,6 +44,8 @@ export interface InvoiceItemRecord {
   quantity: string;
   unitPrice: string;
   lineTotal: string;
+  unitSnapshot?: string;
+  vehicleCategorySnapshot?: VehicleCategory | null;
 }
 
 export interface InvoicePaymentRecord {
@@ -66,6 +80,8 @@ export interface InvoiceSummary {
   issuedByName: string;
   issuedAt: string;
   businessDate: string;
+  vehicleCategory?: VehicleCategory | null;
+  unitSnapshot?: string;
 }
 
 export interface InvoicePaymentAdjustmentRecord {
@@ -106,6 +122,7 @@ export interface CreateInvoiceRequest {
     location: string;
     notes?: string | null;
   };
+  vehicleCategory: VehicleCategory;
   items: Array<{
     materialId: number;
     quantity: string;

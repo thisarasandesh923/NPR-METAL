@@ -46,11 +46,12 @@ describe("Phase 3A — Auth Unit Tests (Hashing, Cookies, SecurityConfig & RBAC)
     const prodCookie = formatSessionCookie(raw, future, true);
     assert.match(prodCookie, new RegExp(`^${SESSION_COOKIE_NAME}=`));
     assert.match(prodCookie, /HttpOnly/);
-    assert.match(prodCookie, /SameSite=Lax/);
+    assert.match(prodCookie, /SameSite=None/);
     assert.match(prodCookie, /Path=\//);
     assert.match(prodCookie, /; Secure$/);
 
     const devCookie = formatSessionCookie(raw, future, false);
+    assert.match(devCookie, /SameSite=Lax/);
     assert.doesNotMatch(devCookie, /; Secure/);
 
     const cleared = formatClearSessionCookie(true);

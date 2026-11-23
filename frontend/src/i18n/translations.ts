@@ -94,6 +94,11 @@ export interface Translations {
   selectedCustomerBadge: string;
   changeCustomer: string;
   newCustomerNotice: string;
+  sellingPriceCategory: string;
+  sellingPriceCategorySubtitle: string;
+  vehicleCategoryTractor: string;
+  vehicleCategoryTipper: string;
+  unconfiguredPriceAlert: string;
   stepMaterials: string;
   stepMaterialsSubtitle: string;
   serverLockedPrices: string;
@@ -297,12 +302,17 @@ export const translations: Record<Language, Translations> = {
     selectedCustomerBadge: "Selected Customer",
     changeCustomer: "Change Customer",
     newCustomerNotice: "New customer will be automatically registered on invoice issuance.",
+    sellingPriceCategory: "Selling Price Category",
+    sellingPriceCategorySubtitle: "Select Tractor or Tipper price tier for this invoice. Independent of delivery transport.",
+    vehicleCategoryTractor: "Tractor (ට්‍රැක්ටර්)",
+    vehicleCategoryTipper: "Tipper (ටිපර්)",
+    unconfiguredPriceAlert: "Pricing is unconfigured for the selected vehicle category. Invoice submission is blocked.",
     stepMaterials: "Material Details",
-    stepMaterialsSubtitle: "Enter quantities in cubic metres (m³) using PostgreSQL catalogue prices",
+    stepMaterialsSubtitle: "Enter quantities in cubic feet (ft³) using vehicle-specific catalogue prices",
     serverLockedPrices: "Server-Locked Unit Prices",
     materialCol: "Material",
-    quantityCol: "Quantity (m³)",
-    unitPriceCol: "Unit Price (Rs. / m³)",
+    quantityCol: "Quantity (ft³)",
+    unitPriceCol: "Unit Price (Rs. / ft³)",
     lineTotalCol: "Line Total",
     removeCol: "Remove",
     selectMaterialPlaceholder: "Select material...",
@@ -499,12 +509,17 @@ export const translations: Record<Language, Translations> = {
     selectedCustomerBadge: "තෝරාගත් පාරිභෝගිකයා",
     changeCustomer: "වෙනස් කරන්න",
     newCustomerNotice: "නව පාරිභෝගිකයෙකු නම් බිල්පත නිකුත් කිරීමේදී ස්වයංක්‍රීයව ලියාපදිංචි වේ.",
+    sellingPriceCategory: "විකුණුම් මිල කාණ්ඩය (වාහනය අනුව)",
+    sellingPriceCategorySubtitle: "මෙම බිල්පත සඳහා ට්‍රැක්ටර් හෝ ටිපර් මිල කාණ්ඩය තෝරන්න (ප්‍රවාහන සේවාවට අදාළ නොවේ)",
+    vehicleCategoryTractor: "ට්‍රැක්ටර් (Tractor)",
+    vehicleCategoryTipper: "ටිපර් (Tipper)",
+    unconfiguredPriceAlert: "තෝරාගත් වාහන කාණ්ඩය සඳහා මිල ගණන් තවම සකසා නොමැත. බිල්පත නිකුත් කළ නොහැක.",
     stepMaterials: "2. විකුණුම් ද්‍රව්‍ය තෝරාගැනීම",
-    stepMaterialsSubtitle: "පද්ධතියේ නියමිත මිල ගණන් අනුව ඝන මීටර් (m³) ප්‍රමාණය ඇතුළත් කරන්න",
+    stepMaterialsSubtitle: "වාහන කාණ්ඩය අනුව නියමිත මිල ගණන් මත ඝන අඩි (ft³) ප්‍රමාණය ඇතුළත් කරන්න",
     serverLockedPrices: "පද්ධතියේ ස්ථිර මිල ගණන්",
     materialCol: "ද්‍රව්‍යය",
-    quantityCol: "ප්‍රමාණය (m³)",
-    unitPriceCol: "ඒකක මිල (රු.)",
+    quantityCol: "ප්‍රමාණය (ft³)",
+    unitPriceCol: "ඒකක මිල (රු. / ft³)",
     lineTotalCol: "පේළියේ එකතුව",
     removeCol: "ඉවත් කරන්න",
     selectMaterialPlaceholder: "ද්‍රව්‍යය තෝරන්න...",

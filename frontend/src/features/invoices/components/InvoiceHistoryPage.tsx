@@ -157,7 +157,12 @@ export function InvoiceHistoryPage({
                     className="border-t border-slate-100 transition hover:bg-slate-50/70"
                   >
                     <td className="font-extrabold text-[#124f8c]">
-                      {inv.invoiceNumber}
+                      <div>{inv.invoiceNumber}</div>
+                      {inv.vehicleCategory && (
+                        <span className="inline-flex rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-[#124f8c]">
+                          {inv.vehicleCategory === "TRACTOR" ? "🚜 Tractor" : "🚚 Tipper"}
+                        </span>
+                      )}
                     </td>
                     <td>
                       <p className="font-bold text-[#092547]">{inv.customerName}</p>

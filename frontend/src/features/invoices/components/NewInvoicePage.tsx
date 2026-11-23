@@ -23,6 +23,8 @@ export function NewInvoicePage({ onCancel }: NewInvoicePageProps) {
     customerDraft,
     handleSelectCustomer,
     handleChangeCustomerDraft,
+    vehicleCategory,
+    handleSelectVehicleCategory,
     items,
     updateMaterial,
     updateQuantity,
@@ -40,6 +42,7 @@ export function NewInvoicePage({ onCancel }: NewInvoicePageProps) {
     persistedInvoice,
     saveInvoice,
     resetForNewInvoice,
+    unconfiguredWarning,
     canSubmit,
   } = useInvoiceForm();
 
@@ -142,6 +145,9 @@ export function NewInvoicePage({ onCancel }: NewInvoicePageProps) {
         <MaterialItemsSection
           materials={materials}
           items={items}
+          vehicleCategory={vehicleCategory}
+          onSelectVehicleCategory={handleSelectVehicleCategory}
+          unconfiguredWarning={unconfiguredWarning}
           onUpdateMaterial={updateMaterial}
           onUpdateQuantity={updateQuantity}
           onAddItem={addItem}

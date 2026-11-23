@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchMaterials, issueInvoiceRequest } from "../../../api/billing.ts";
 import { ApiError } from "../../../api/client.ts";
 import type {
+  CreateInvoiceRequest,
   CustomerRecord,
   InvoiceDetail,
   MaterialCatalogItem,
+  VehicleCategory,
 } from "../../../types/billing.ts";
 import { calculateInvoiceTotals } from "../../../utils/invoiceCalculator.ts";
 import type { MaterialRow } from "../../../types/invoice.ts";
@@ -16,6 +18,17 @@ function generateUuid(): string {
     return crypto.randomUUID();
   }
   return `inv-${Date.now()}-${Math.random().toString(16).slice(2, 14)}`;
+}
+
+export function getMaterialVehiclePrice(
+  mat: MaterialCatalogItem | undefined,
+  category: VehicleCategory
+): string | null {
+  if (!mat) return null;
+  if (category === "TRACTOR") {
+    return mat.tractorPricePerFt3 ?? mat.vehiclePrices?.TRACTOR?.pricePerFt3 ?? null;
+  }
+  return mat.tipperPricePerFt3 ?? mat.vehiclePrices?.TIPPER?.pricePerFt3 ?? null;
 }
 
 export function useInvoiceForm() {
@@ -31,6 +44,8 @@ export function useInvoiceForm() {
     location: "",
   });
 
+  const [vehicleCategory, setVehicleCategory] =
+    useState<VehicleCategory>("TRACTOR");
   const [items, setItems] = useState<InvoiceLineDraft[]>([]);
   const [withTransport, setWithTransport] = useState(false);
   const [transportFee, setTransportFee] = useState("0.00");
@@ -82,6 +97,11 @@ export function useInvoiceForm() {
 
   const handleChangeCustomerDraft = (next: CustomerDraft) => {
     setCustomerDraft(next);
+    invalidateIdempotency();
+  };
+
+  const handleSelectVehicleCategory = (cat: VehicleCategory) => {
+    setVehicleCategory(cat);
     invalidateIdempotency();
   };
 
@@ -144,11 +164,16 @@ export function useInvoiceForm() {
   const materialsById = new Map(materials.map((m) => [m.id, m]));
   const previewRows: MaterialRow[] = items.map((line) => {
     const mat = materialsById.get(line.materialId);
+    const unitPriceStr = getMaterialVehiclePrice(mat, vehicleCategory);
+    const unitPriceNum =
+      unitPriceStr !== null && unitPriceStr !== undefined && unitPriceStr.trim() !== ""
+        ? Number(unitPriceStr)
+        : 0;
     return {
       id: line.rowKey,
       material: (mat?.name as MaterialRow["material"]) ?? '3/4"',
       quantity: Number(line.quantity) || 0,
-      price: mat ? Number(mat.currentUnitPrice) : 0,
+      price: Number.isFinite(unitPriceNum) && unitPriceNum > 0 ? unitPriceNum : 0,
     };
   });
 
@@ -158,6 +183,25 @@ export function useInvoiceForm() {
     withTransport ? Number(transportFee) || 0 : 0,
     Number(cashReceived) || 0
   );
+
+  const unconfiguredItem = items.find((line) => {
+    const mat = materialsById.get(line.materialId);
+    const priceStr = getMaterialVehiclePrice(mat, vehicleCategory);
+    return (
+      priceStr === null ||
+      priceStr === undefined ||
+      priceStr.trim() === "" ||
+      !Number.isFinite(Number(priceStr)) ||
+      Number(priceStr) <= 0
+    );
+  });
+
+  const unconfiguredMaterial = unconfiguredItem
+    ? materialsById.get(unconfiguredItem.materialId)
+    : null;
+  const unconfiguredWarning = unconfiguredMaterial
+    ? `Price for ${unconfiguredMaterial.name} is unconfigured for ${vehicleCategory}. Set price before issuing.`
+    : null;
 
   const validateBeforeSave = (): string | null => {
     if (materials.length === 0) {
@@ -182,6 +226,9 @@ export function useInvoiceForm() {
       if (!/^\d+(?:\.\d{1,3})?$/.test(q) || Number(q) <= 0) {
         return `Item #${i + 1} quantity must be greater than 0 (max 3 decimals).`;
       }
+    }
+    if (unconfiguredItem) {
+      return `Price for ${unconfiguredMaterial?.name ?? "Material"} is unconfigured for ${vehicleCategory}. Set price before issuing.`;
     }
     if (withTransport) {
       const tf = transportFee.trim();
@@ -214,7 +261,7 @@ export function useInvoiceForm() {
     setSubmitError(null);
 
     try {
-      const payload = {
+      const payload: CreateInvoiceRequest = {
         ...(selectedCustomer
           ? { customerId: selectedCustomer.id }
           : {
@@ -224,6 +271,7 @@ export function useInvoiceForm() {
                 location: customerDraft.location.trim(),
               },
             }),
+        vehicleCategory,
         items: items.map((line) => ({
           materialId: line.materialId,
           quantity: line.quantity.trim(),
@@ -252,6 +300,7 @@ export function useInvoiceForm() {
   const resetForNewInvoice = () => {
     setSelectedCustomer(null);
     setCustomerDraft({ name: "", phone: "", location: "" });
+    setVehicleCategory("TRACTOR");
     setItems(
       materials.length > 0
         ? [{ rowKey: Date.now(), materialId: materials[0].id, quantity: "1.000" }]
@@ -274,6 +323,8 @@ export function useInvoiceForm() {
     customerDraft,
     handleSelectCustomer,
     handleChangeCustomerDraft,
+    vehicleCategory,
+    handleSelectVehicleCategory,
     items,
     updateMaterial,
     updateQuantity,
@@ -292,6 +343,12 @@ export function useInvoiceForm() {
     setPersistedInvoice,
     saveInvoice,
     resetForNewInvoice,
-    canSubmit: !materialsLoading && materials.length > 0 && !totals.isOverpayment,
+    unconfiguredItem,
+    unconfiguredWarning,
+    canSubmit:
+      !materialsLoading &&
+      materials.length > 0 &&
+      !totals.isOverpayment &&
+      !unconfiguredItem,
   };
 }

@@ -1,43 +1,118 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-Starts an isolated local PostgreSQL 17 Docker database, runs all migrations 001-008,
+Starts an isolated local PostgreSQL 17 Docker database, runs all migrations 001-015,
 provisions npr_app_user, seeds clearly fictional LOCAL DEMO accounts/data, and launches
 backend + Vite dev servers against localhost ONLY (never touches backend/.env or Supabase).
+
+.PARAMETER Reset
+Prompts for confirmation to destroy existing local demo data in 'npr-local-demo-pg' and start fresh.
+
+.PARAMETER Force
+Skips the confirmation prompt when combined with -Reset.
 #>
+[CmdletBinding()]
+param(
+  [switch]$Reset,
+  [switch]$Force
+)
+
 $ErrorActionPreference = "Stop"
 
 $RootDir = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 Push-Location $RootDir
 
 try {
-  Write-Host "1. Starting isolated local Docker PostgreSQL 17 on 127.0.0.1:55432..."
-  docker rm -f npr-local-demo-pg 2>$null | Out-Null
-  docker run -d `
-    --name npr-local-demo-pg `
-    -e POSTGRES_USER=postgres `
-    -e POSTGRES_PASSWORD=postgres `
-    -e POSTGRES_DB=npr_test_db `
-    -p 127.0.0.1:55432:5432 `
-    postgres:17-alpine | Out-Null
+  # Pre-flight: Check Docker daemon availability
+  docker version *> $null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error @"
+Docker Desktop is not running or the docker CLI is unavailable.
+Please start Docker Desktop and ensure it is ready before launching the local demo.
+"@
+    exit 1
+  }
+
+  $ContainerName = "npr-local-demo-pg"
+  $containerInspect = docker inspect $ContainerName 2>$null
+  $containerExists = ($LASTEXITCODE -eq 0 -and $containerInspect)
+
+  if ($containerExists) {
+    if ($Reset) {
+      if (-not $Force) {
+        $confirm = Read-Host "Existing container '$ContainerName' found with demo data. Resetting will DESTROY all data. Proceed? (y/N)"
+        if ($confirm -notmatch '^[yY]') {
+          Write-Host "Reset cancelled. Reusing existing container '$ContainerName'."
+          $Reset = $false
+        }
+      }
+      if ($Reset) {
+        Write-Host "Removing existing container '$ContainerName' as requested..."
+        docker rm -f $ContainerName | Out-Null
+        $containerExists = $false
+      }
+    }
+  }
+
+  if (-not $containerExists) {
+    # Check port 55432 conflict with other containers
+    $conflicting = docker ps --filter "publish=55432" --format "{{.Names}}"
+    if ($conflicting -and $conflicting -ne $ContainerName) {
+      throw "Port 55432 is already bound by container '$conflicting'. Please run 'docker stop $conflicting' before starting the demo."
+    }
+
+    Write-Host "1. Creating fresh isolated local Docker PostgreSQL 17 on 127.0.0.1:55432..."
+    docker run -d `
+      --name $ContainerName `
+      -e POSTGRES_USER=postgres `
+      -e POSTGRES_PASSWORD=postgres `
+      -e POSTGRES_DB=npr_test_db `
+      -p 127.0.0.1:55432:5432 `
+      postgres:17-alpine | Out-Null
+  } else {
+    $isRunning = docker inspect -f '{{.State.Running}}' $ContainerName 2>$null
+    if ($isRunning -eq "true") {
+      Write-Host "1. Using already running local demo container '$ContainerName' on 127.0.0.1:55432..."
+    } else {
+      Write-Host "1. Starting existing local demo container '$ContainerName' on 127.0.0.1:55432..."
+      docker start $ContainerName | Out-Null
+    }
+  }
 
   $ready = $false
   for ($i = 0; $i -lt 30; $i++) {
-    docker exec npr-local-demo-pg pg_isready -U postgres -d npr_test_db *> $null
+    docker exec $ContainerName pg_isready -U postgres -d npr_test_db *> $null
     if ($LASTEXITCODE -eq 0) { $ready = $true; break }
     Start-Sleep -Seconds 1
   }
   if (-not $ready) {
-    throw "Local PostgreSQL 17 failed to initialize within 30 seconds."
+    throw "Local PostgreSQL 17 container '$ContainerName' failed to respond within 30 seconds."
   }
 
-  Write-Host "2. Creating Supabase compatibility roles (anon/authenticated) locally..."
-  docker exec npr-local-demo-pg psql -U postgres -d npr_test_db -c "DO `$`$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF; IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF; END `$`$;" | Out-Null
+  Write-Host "2. Ensuring Supabase compatibility roles (anon/authenticated) and restricted npr_app_user exist..."
+  docker exec $ContainerName psql -U postgres -d npr_test_db -c "DO `$`$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+      CREATE ROLE anon NOLOGIN;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+      CREATE ROLE authenticated NOLOGIN;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'npr_app_user') THEN
+      CREATE ROLE npr_app_user WITH
+        NOLOGIN
+        NOSUPERUSER
+        NOCREATEDB
+        NOCREATEROLE
+        NOREPLICATION
+        NOINHERIT
+        NOBYPASSRLS;
+    END IF;
+  END `$`$;" | Out-Null
 
   $LocalAdminUrl = "postgres://postgres:postgres@127.0.0.1:55432/npr_test_db"
   $LocalAppUrl = "postgres://npr_app_user:test_only_app_password_2b2@127.0.0.1:55432/npr_test_db"
 
-  Write-Host "3. Applying forward-only SQL migrations 001-008..."
+  Write-Host "3. Applying forward-only SQL migrations 001-015 (including vehicle ft³ pricing)..."
   $env:MIGRATION_DATABASE_URL = $LocalAdminUrl
   $env:DATABASE_URL = $LocalAdminUrl
   npm --prefix backend run migrate:up
@@ -48,7 +123,7 @@ try {
   npx --prefix backend tsx backend/src/scripts/provision-test-role.ts
   if ($LASTEXITCODE -ne 0) { throw "Role provisioning failed." }
 
-  Write-Host "5. Seeding clearly fictional Local Demo workshop data..."
+  Write-Host "5. Seeding clearly fictional Local Demo workshop data (materials, vehicle prices, accounts)..."
   $env:LOCAL_DEMO_DATABASE_URL = $LocalAdminUrl
   npx --prefix backend tsx backend/src/scripts/seed-local-demo.ts
   if ($LASTEXITCODE -ne 0) { throw "Demo seed failed." }
@@ -60,6 +135,7 @@ try {
   Write-Host "Frontend UI will run at:  http://localhost:5173"
   Write-Host "Demo Owner Login:         demo_owner    / LocalDemoPass!2026"
   Write-Host "Demo Cashier Login:       demo_cashier  / LocalDemoPass!2026"
+  Write-Host "Vehicle Pricing (ft³):    TRACTOR & TIPPER prices seeded"
   Write-Host "============================================================"
   Write-Host ""
 
@@ -73,4 +149,3 @@ try {
 } finally {
   Pop-Location
 }
-

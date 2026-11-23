@@ -39,6 +39,9 @@ const createInvoiceSchema = z
         notes: z.string().trim().max(500).optional().nullable(),
       })
       .optional(),
+    vehicleCategory: z.enum(["TRACTOR", "TIPPER"], {
+      error: "Vehicle category must be either TRACTOR or TIPPER.",
+    }),
     items: z
       .array(
         z.object({
@@ -140,4 +143,3 @@ export class InvoicesController {
     });
   };
 }
-

@@ -106,6 +106,7 @@ describe("Operations, Approvals, Payroll, Reports & Payment Adjustments — PG 1
       headers: {
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
+        "X-Forwarded-For": `203.0.113.${Math.floor(Math.random() * 200) + 20}`,
       },
       body: JSON.stringify({ username: ownerUsername, password: pwd }),
     });
@@ -118,6 +119,7 @@ describe("Operations, Approvals, Payroll, Reports & Payment Adjustments — PG 1
       headers: {
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
+        "X-Forwarded-For": `203.0.113.${Math.floor(Math.random() * 200) + 20}`,
       },
       body: JSON.stringify({ username: cashierUsername, password: pwd }),
     });

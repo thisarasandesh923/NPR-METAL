@@ -2,8 +2,10 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { UnauthorizedError, ValidationError } from "../../errors/appError.js";
 import type { MaterialsService } from "./materials.service.js";
+import type { VehicleCategory } from "./materials.types.js";
 
 const updatePriceSchema = z.object({
+  vehicleCategory: z.enum(["TRACTOR", "TIPPER"]).optional(),
   newPrice: z.union([z.string().trim().min(1), z.number().finite()]),
   reason: z
     .string({ error: "Price change reason is required." })
@@ -42,6 +44,16 @@ export class MaterialsController {
       materialId = parsed;
     }
 
+    let vehicleCategory: VehicleCategory | "ALL" | undefined;
+    if (typeof req.query.vehicleCategory === "string" && req.query.vehicleCategory.trim() !== "") {
+      const cat = req.query.vehicleCategory.trim().toUpperCase();
+      if (cat === "TRACTOR" || cat === "TIPPER" || cat === "ALL") {
+        vehicleCategory = cat as VehicleCategory | "ALL";
+      } else {
+        throw new ValidationError("Invalid vehicleCategory filter. Must be TRACTOR, TIPPER, or ALL.");
+      }
+    }
+
     const userId =
       typeof req.query.userId === "string" && req.query.userId.trim() !== ""
         ? req.query.userId.trim()
@@ -61,6 +73,7 @@ export class MaterialsController {
 
     const history = await this.materialsService.getPriceHistory({
       materialId,
+      vehicleCategory,
       userId,
       dateFrom,
       dateTo,
@@ -105,6 +118,7 @@ export class MaterialsController {
     const material = await this.materialsService.updatePrice(
       {
         materialId,
+        vehicleCategory: parsed.data.vehicleCategory,
         newPrice: parsed.data.newPrice,
         reason: parsed.data.reason,
         expectedVersion: parsed.data.expectedVersion,

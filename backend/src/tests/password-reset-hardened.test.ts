@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -385,8 +385,11 @@ describe("Harden User Password Reset Tool — Unit & Transaction Tests", () => {
         await client.query(`DELETE FROM public.user_sessions WHERE user_id = $1`, [testUserId]).catch(() => {});
         await client.query(`DELETE FROM public.users WHERE id = $1`, [testUserId]).catch(() => {});
         client.release();
-        await testPool.end();
       }
+    });
+
+    after(async () => {
+      await testPool.end();
     });
 
     it("reproduces PostgreSQL 42P08 inconsistent types error when $1 is reused across UUID and VARCHAR, and verifies fix succeeds", async () => {
@@ -415,6 +418,11 @@ describe("Harden User Password Reset Tool — Unit & Transaction Tests", () => {
         const testUserId = randomUUID();
         const testDetails = JSON.stringify({ test: "clean" });
         await client.query("BEGIN");
+        await client.query(
+          `INSERT INTO public.users (id, username, full_name, password_hash, role, is_active)
+           VALUES ($1, $2, 'FK User', 'dummyhash', 'CASHIER', true)`,
+          [testUserId, `tmp_fk_${Date.now()}`]
+        );
         await client.query({
           name: "stmt_distinct_param_42p08_fixed",
           text: `INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
@@ -431,7 +439,6 @@ describe("Harden User Password Reset Tool — Unit & Transaction Tests", () => {
         await client.query("ROLLBACK");
       } finally {
         client.release();
-        await testPool.end();
       }
     });
   });

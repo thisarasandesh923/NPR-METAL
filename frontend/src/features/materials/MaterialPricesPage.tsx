@@ -8,9 +8,14 @@ import {
 } from "../../api/operations.ts";
 import { Icon } from "../../components/ui/Icon.tsx";
 import { useAuth } from "../../context/AuthContext.tsx";
-import type { MaterialCatalogItem } from "../../types/billing.ts";
+import type { MaterialCatalogItem, VehicleCategory } from "../../types/billing.ts";
 import type { MaterialPriceHistoryRecord } from "../../types/operations.ts";
 import { formatColomboDateTime, formatLkr } from "../../utils/formatters.ts";
+
+interface EditingTarget {
+  material: MaterialCatalogItem;
+  vehicleCategory: VehicleCategory;
+}
 
 export function MaterialPricesPage() {
   const { user } = useAuth();
@@ -25,11 +30,12 @@ export function MaterialPricesPage() {
 
   // Owner audit history filter state
   const [selectedMaterialId, setSelectedMaterialId] = useState("");
+  const [selectedVehicleCategory, setSelectedVehicleCategory] = useState("");
   const [cashierQuery, setCashierQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  const [editing, setEditing] = useState<MaterialCatalogItem | null>(null);
+  const [editing, setEditing] = useState<EditingTarget | null>(null);
   const [newPrice, setNewPrice] = useState("");
   const [reason, setReason] = useState("");
   const [activateOnSave, setActivateOnSave] = useState(true);
@@ -44,7 +50,7 @@ export function MaterialPricesPage() {
         if (isOwner) {
           const [mats, hist] = await Promise.all([
             fetchMaterials(true),
-            fetchMaterialPriceHistory(historyFilters),
+            fetchMaterialPriceHistory(historyFilters ?? { vehicleCategory: "ALL" }),
           ]);
           setMaterials(mats);
           setHistory(hist);
@@ -70,17 +76,19 @@ export function MaterialPricesPage() {
     void fetchAll();
   }, [fetchAll]);
 
-  function openEditModal(item: MaterialCatalogItem) {
+  function openEditModal(item: MaterialCatalogItem, category: VehicleCategory = "TRACTOR") {
     if (!isOwner && !item.isActive) {
       return;
     }
-    setEditing(item);
-    setNewPrice(item.isActive ? item.currentUnitPrice : "");
+    const currentPrice =
+      category === "TRACTOR" ? item.tractorPricePerFt3 : item.tipperPricePerFt3;
+    setEditing({ material: item, vehicleCategory: category });
+    setNewPrice(currentPrice ?? "");
     setActivateOnSave(true);
     setReason(
       item.isActive
         ? ""
-        : "Initial price configuration & activation for aggregate catalogue"
+        : `Initial price configuration & activation for aggregate catalogue (${category})`
     );
     setModalError(null);
   }
@@ -94,19 +102,29 @@ export function MaterialPricesPage() {
     }
     setSaving(true);
     setModalError(null);
+
+    const vp =
+      editing.vehicleCategory === "TRACTOR"
+        ? editing.material.vehiclePrices?.TRACTOR
+        : editing.material.vehiclePrices?.TIPPER;
+    const expectedVersion = vp?.version ?? 1;
+
     try {
-      const updated = await updateMaterialPrice(editing.id, {
+      const updated = await updateMaterialPrice(editing.material.id, {
+        vehicleCategory: editing.vehicleCategory,
         newPrice: newPrice.trim(),
         reason: reason.trim(),
-        expectedVersion: editing.version ?? 1,
-        isActive: isOwner && !editing.isActive ? activateOnSave : undefined,
+        expectedVersion,
+        isActive: isOwner && !editing.material.isActive ? activateOnSave : undefined,
       });
-      setEditing(null);
+      const catLabel = editing.vehicleCategory === "TRACTOR" ? "Tractor" : "Tipper";
       setNotice(
-        `Updated selling price for ${updated.name} to ${formatLkr(updated.currentUnitPrice)} per m³${!editing.isActive && updated.isActive ? " and activated for cashier billing" : ""}. Existing issued invoices remain unchanged.`
+        `Updated selling price for ${updated.name} to ${formatLkr(newPrice.trim())} per ft³ (${catLabel})${!editing.material.isActive && updated.isActive ? " and activated for cashier billing" : ""}. Existing issued invoices remain unchanged.`
       );
+      setEditing(null);
       await fetchAll({
         materialId: selectedMaterialId ? Number(selectedMaterialId) : undefined,
+        vehicleCategory: (selectedVehicleCategory as VehicleCategory | "ALL") || "ALL",
         cashierId: cashierQuery.trim() || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
@@ -128,6 +146,7 @@ export function MaterialPricesPage() {
     try {
       const hist = await fetchMaterialPriceHistory({
         materialId: selectedMaterialId ? Number(selectedMaterialId) : undefined,
+        vehicleCategory: (selectedVehicleCategory as VehicleCategory | "ALL") || "ALL",
         cashierId: cashierQuery.trim() || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
@@ -146,6 +165,7 @@ export function MaterialPricesPage() {
 
   async function handleClearFilters() {
     setSelectedMaterialId("");
+    setSelectedVehicleCategory("");
     setCashierQuery("");
     setDateFrom("");
     setDateTo("");
@@ -153,7 +173,7 @@ export function MaterialPricesPage() {
     setHistoryLoading(true);
     setError(null);
     try {
-      const hist = await fetchMaterialPriceHistory();
+      const hist = await fetchMaterialPriceHistory({ vehicleCategory: "ALL" });
       setHistory(hist);
     } catch (err) {
       setError(
@@ -178,14 +198,15 @@ export function MaterialPricesPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {isOwner
-              ? "Update selling prices per cubic metre (m³). Issued invoices retain their historical price snapshots permanently."
-              : "Update current aggregate selling prices per cubic metre (m³). All changes take effect immediately and are recorded in the Owner audit log."}
+              ? "Update selling prices per cubic foot (ft³). Issued invoices retain their historical price snapshots permanently."
+              : "Update current aggregate selling prices per cubic foot (ft³). All changes take effect immediately and are recorded in the Owner audit log."}
           </p>
         </div>
         <button
           type="button"
           onClick={() => void fetchAll({
             materialId: selectedMaterialId ? Number(selectedMaterialId) : undefined,
+            vehicleCategory: (selectedVehicleCategory as VehicleCategory | "ALL") || "ALL",
             cashierId: cashierQuery.trim() || undefined,
             dateFrom: dateFrom || undefined,
             dateTo: dateTo || undefined,
@@ -220,11 +241,11 @@ export function MaterialPricesPage() {
               <tr>
                 <th className="px-6 py-3.5">Code</th>
                 <th className="px-6 py-3.5">Material</th>
-                <th className="px-6 py-3.5">Unit</th>
                 <th className="px-6 py-3.5">Status</th>
-                <th className="px-6 py-3.5 text-right">Current Price (LKR)</th>
+                <th className="px-6 py-3.5 text-right">Tractor Price (Rs./ft³)</th>
+                <th className="px-6 py-3.5 text-right">Tipper Price (Rs./ft³)</th>
                 <th className="px-6 py-3.5">Version</th>
-                <th className="px-6 py-3.5 text-right">Action</th>
+                <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -247,7 +268,6 @@ export function MaterialPricesPage() {
                       {m.code}
                     </td>
                     <td className="px-6 py-4 font-bold text-[#092547]">{m.name}</td>
-                    <td className="px-6 py-4 text-slate-600">{m.unit}</td>
                     <td className="px-6 py-4">
                       {m.isActive ? (
                         <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
@@ -260,22 +280,56 @@ export function MaterialPricesPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right font-extrabold text-[#092547]">
-                      {m.isActive || Number(m.currentUnitPrice) > 0
-                        ? formatLkr(m.currentUnitPrice)
-                        : "Unpriced (Rs. 0.00)"}
+                      {m.tractorPricePerFt3 ? (
+                        formatLkr(m.tractorPricePerFt3)
+                      ) : (
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">
+                          Not Set
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right font-extrabold text-[#092547]">
+                      {m.tipperPricePerFt3 ? (
+                        formatLkr(m.tipperPricePerFt3)
+                      ) : (
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">
+                          Not Set
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-xs text-slate-500">
-                      v{m.version ?? 1}
+                      🚜 v{m.vehiclePrices?.TRACTOR?.version ?? 1} · 🚚 v{m.vehiclePrices?.TIPPER?.version ?? 1}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {m.isActive || isOwner ? (
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(m)}
-                          className="rounded-xl bg-[#092547] px-4 py-2 text-xs font-bold text-white hover:bg-[#103462]"
-                        >
-                          {m.isActive ? "Update Price" : "Configure & Activate"}
-                        </button>
+                      {m.isActive ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(m, "TRACTOR")}
+                            className="rounded-xl bg-[#092547] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#103462]"
+                            aria-label={`Update Tractor Price for ${m.name}`}
+                          >
+                            Update Price (Tractor)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(m, "TIPPER")}
+                            className="rounded-xl border border-[#092547] bg-white px-3 py-1.5 text-xs font-bold text-[#092547] hover:bg-slate-50"
+                            aria-label={`Update Tipper Price for ${m.name}`}
+                          >
+                            Update Price (Tipper)
+                          </button>
+                        </div>
+                      ) : isOwner ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(m, "TRACTOR")}
+                            className="rounded-xl bg-[#f58220] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#df7318]"
+                          >
+                            Configure & Activate
+                          </button>
+                        </div>
                       ) : (
                         <span className="text-xs text-slate-400">Owner Activation Required</span>
                       )}
@@ -310,7 +364,7 @@ export function MaterialPricesPage() {
 
             <form
               onSubmit={handleApplyFilters}
-              className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5"
+              className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6"
             >
               <div>
                 <label
@@ -331,6 +385,25 @@ export function MaterialPricesPage() {
                       {m.name} ({m.code})
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="filter-vehicle-category"
+                  className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500"
+                >
+                  Category
+                </label>
+                <select
+                  id="filter-vehicle-category"
+                  value={selectedVehicleCategory}
+                  onChange={(e) => setSelectedVehicleCategory(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-[#092547]"
+                >
+                  <option value="">All Categories</option>
+                  <option value="TRACTOR">Tractor (ට්‍රැක්ටර්)</option>
+                  <option value="TIPPER">Tipper (ටිපර්)</option>
                 </select>
               </div>
 
@@ -408,6 +481,7 @@ export function MaterialPricesPage() {
                 <tr>
                   <th className="px-6 py-3">Effective At</th>
                   <th className="px-6 py-3">Material</th>
+                  <th className="px-6 py-3">Category</th>
                   <th className="px-6 py-3 text-right">Old Price</th>
                   <th className="px-6 py-3 text-right">New Price</th>
                   <th className="px-6 py-3">Changed By</th>
@@ -417,7 +491,7 @@ export function MaterialPricesPage() {
               <tbody className="divide-y divide-slate-100">
                 {history.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                    <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
                       No price changes recorded yet.
                     </td>
                   </tr>
@@ -430,8 +504,17 @@ export function MaterialPricesPage() {
                       <td className="px-6 py-3.5 font-bold text-[#092547]">
                         {h.materialName}
                       </td>
+                      <td className="px-6 py-3.5 font-bold text-slate-700">
+                        {h.vehicleCategory ? (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-xs font-bold text-[#092547]">
+                            {h.vehicleCategory === "TRACTOR" ? "🚜 Tractor" : "🚚 Tipper"}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="px-6 py-3.5 text-right text-slate-500">
-                        {formatLkr(h.oldPrice)}
+                        {h.oldPrice ? formatLkr(h.oldPrice) : "Not Set"}
                       </td>
                       <td className="px-6 py-3.5 text-right font-bold text-emerald-700">
                         {formatLkr(h.newPrice)}
@@ -471,7 +554,7 @@ export function MaterialPricesPage() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={`Update Price for ${editing.name}`}
+          aria-label={`Update Price for ${editing.material.name}`}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#092547]/55 p-4 backdrop-blur-sm"
         >
           <form
@@ -480,9 +563,9 @@ export function MaterialPricesPage() {
           >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-extrabold text-[#092547]">
-                {editing.isActive
-                  ? `Update Price — ${editing.name}`
-                  : `Configure Price & Activate — ${editing.name}`}
+                {editing.material.isActive
+                  ? `Update Price — ${editing.material.name} (${editing.vehicleCategory === "TRACTOR" ? "Tractor" : "Tipper"})`
+                  : `Configure Price & Activate — ${editing.material.name} (${editing.vehicleCategory === "TRACTOR" ? "Tractor" : "Tipper"})`}
               </h3>
               <button
                 type="button"
@@ -494,13 +577,61 @@ export function MaterialPricesPage() {
               </button>
             </div>
 
-            {editing.isActive ? (
+            {/* Category switcher tab */}
+            <div className="mb-4 flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing({ ...editing, vehicleCategory: "TRACTOR" });
+                  setNewPrice(editing.material.tractorPricePerFt3 ?? "");
+                }}
+                className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                  editing.vehicleCategory === "TRACTOR"
+                    ? "bg-white text-[#092547] shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                🚜 Tractor Rate
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing({ ...editing, vehicleCategory: "TIPPER" });
+                  setNewPrice(editing.material.tipperPricePerFt3 ?? "");
+                }}
+                className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                  editing.vehicleCategory === "TIPPER"
+                    ? "bg-white text-[#092547] shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                🚚 Tipper Rate
+              </button>
+            </div>
+
+            {editing.material.isActive ? (
               <p className="mb-4 text-xs text-slate-500">
-                Current Price: <strong className="text-[#092547]">{formatLkr(editing.currentUnitPrice)}</strong> / {editing.unit} (Version v{editing.version ?? 1})
+                Current {editing.vehicleCategory === "TRACTOR" ? "Tractor" : "Tipper"} Price:{" "}
+                <strong className="text-[#092547]">
+                  {(editing.vehicleCategory === "TRACTOR"
+                    ? editing.material.tractorPricePerFt3
+                    : editing.material.tipperPricePerFt3)
+                    ? formatLkr(
+                        (editing.vehicleCategory === "TRACTOR"
+                          ? editing.material.tractorPricePerFt3
+                          : editing.material.tipperPricePerFt3)!
+                      )
+                    : "Not Set (Rs. 0.00)"}
+                </strong>{" "}
+                / ft³ (Version v
+                {(editing.vehicleCategory === "TRACTOR"
+                  ? editing.material.vehiclePrices?.TRACTOR?.version
+                  : editing.material.vehiclePrices?.TIPPER?.version) ?? 1}
+                )
               </p>
             ) : (
               <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                This aggregate is currently <strong>Inactive</strong>. Enter an approved selling price per m³ to activate it for Cashier billing.
+                This aggregate is currently <strong>Inactive</strong>. Enter an approved selling price per ft³ to activate it for Cashier billing.
               </div>
             )}
 
@@ -516,7 +647,7 @@ export function MaterialPricesPage() {
                   htmlFor="price-input"
                   className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600"
                 >
-                  New Unit Price (LKR per m³)
+                  New Unit Price (LKR per ft³)
                 </label>
                 <input
                   id="price-input"
@@ -549,7 +680,7 @@ export function MaterialPricesPage() {
                 />
               </div>
 
-              {isOwner && !editing.isActive && (
+              {isOwner && !editing.material.isActive && (
                 <div className="flex items-center gap-2 pt-1">
                   <input
                     id="activate-checkbox"
@@ -580,7 +711,7 @@ export function MaterialPricesPage() {
               >
                 {saving
                   ? "Saving..."
-                  : editing.isActive
+                  : editing.material.isActive
                   ? "Save Price Update"
                   : "Activate & Save Price"}
               </button>

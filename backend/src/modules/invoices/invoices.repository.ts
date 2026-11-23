@@ -6,6 +6,7 @@ import type {
   InvoiceStatus,
   InvoiceSummaryDto,
   PaymentStatus,
+  VehicleCategory,
 } from "./invoices.types.js";
 
 export type DbClient = Pool | PoolClient;
@@ -39,6 +40,8 @@ interface InvoiceLedgerRow {
   issued_by_name: string;
   issued_at: Date;
   business_date: Date | string;
+  vehicle_category: string | null;
+  unit_snapshot: string | null;
 }
 
 interface InvoiceItemRow {
@@ -48,6 +51,8 @@ interface InvoiceItemRow {
   quantity: string;
   unit_price: string;
   line_total: string;
+  unit_snapshot: string | null;
+  vehicle_category_snapshot: string | null;
 }
 
 interface InvoicePaymentRow {
@@ -94,32 +99,80 @@ function mapSummaryRow(row: InvoiceLedgerRow): InvoiceSummaryDto {
     issuedByName: row.issued_by_name,
     issuedAt: row.issued_at.toISOString(),
     businessDate: formatDateOnly(row.business_date),
+    vehicleCategory: (row.vehicle_category as VehicleCategory) || null,
+    unitSnapshot: row.unit_snapshot || "m³",
   };
 }
 
 export async function acquireIdempotencyLock(
   client: PoolClient,
-  lockScope: string,
+  operationType: string,
   idempotencyKey: string
 ): Promise<void> {
   await client.query(
-    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-    [`${lockScope}:${idempotencyKey}`]
+    `SELECT pg_advisory_xact_lock(
+       ('x' || substr(md5($1 || ':' || $2), 1, 16))::bit(64)::bigint
+     )`,
+    [operationType, idempotencyKey]
   );
 }
 
 export async function findIdempotencyRecord(
-  client: PoolClient,
+  client: DbClient,
   idempotencyKey: string
 ): Promise<IdempotencyRecordRow | null> {
   const res = await client.query<IdempotencyRecordRow>(
-    `SELECT operation_type, request_hash, actor_user_id, response_status, response_payload, expires_at
+    `SELECT
+       operation_type,
+       request_hash,
+       actor_user_id,
+       response_status,
+       response_payload,
+       expires_at
      FROM public.idempotency_records
      WHERE idempotency_key = $1
      LIMIT 1`,
     [idempotencyKey]
   );
   return res.rows[0] ?? null;
+}
+
+export async function insertIdempotencyRecord(
+  client: PoolClient,
+  params: {
+    idempotencyKey: string;
+    operationType: string;
+    requestHash: string;
+    actorUserId: string;
+    responseStatus: number;
+    responsePayload: unknown;
+    ttlHours?: number;
+  }
+): Promise<void> {
+  const ttl = params.ttlHours ?? 24;
+  await client.query(
+    `INSERT INTO public.idempotency_records (
+       idempotency_key,
+       operation_type,
+       request_hash,
+       actor_user_id,
+       response_status,
+       response_payload,
+       expires_at
+     ) VALUES (
+       $1, $2, $3, $4, $5, $6,
+       NOW() + ($7 || ' hours')::interval
+     )`,
+    [
+      params.idempotencyKey,
+      params.operationType,
+      params.requestHash,
+      params.actorUserId,
+      params.responseStatus,
+      JSON.stringify(params.responsePayload),
+      String(ttl),
+    ]
+  );
 }
 
 export async function deleteExpiredIdempotencyRecord(
@@ -133,40 +186,6 @@ export async function deleteExpiredIdempotencyRecord(
   );
 }
 
-export async function insertIdempotencyRecord(
-  client: PoolClient,
-  params: {
-    idempotencyKey: string;
-    operationType:
-      | "ISSUE_INVOICE"
-      | "RECORD_PAYMENT"
-      | "PAYMENT_ADJUSTMENT"
-      | "ISSUE_CREDIT_NOTE"
-      | "UPDATE_MATERIAL_PRICE"
-      | "RECORD_WORKER_ADVANCE"
-      | "RECORD_SALARY_PAYMENT"
-      | "RECORD_EXPENSE";
-    requestHash: string;
-    actorUserId: string;
-    responseStatus: number;
-    responsePayload: unknown;
-  }
-): Promise<void> {
-  await client.query(
-    `INSERT INTO public.idempotency_records
-       (idempotency_key, operation_type, request_hash, actor_user_id, response_status, response_payload)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
-    [
-      params.idempotencyKey,
-      params.operationType,
-      params.requestHash,
-      params.actorUserId,
-      params.responseStatus,
-      JSON.stringify(params.responsePayload),
-    ]
-  );
-}
-
 export async function insertDraftInvoice(
   client: PoolClient,
   params: {
@@ -177,6 +196,8 @@ export async function insertDraftInvoice(
     hasTransport: boolean;
     transportFee: string;
     issuedByUserId: string;
+    vehicleCategory?: string | null;
+    unitSnapshot?: string | null;
   }
 ): Promise<{ id: number; invoiceNumber: string }> {
   const res = await client.query<{ id: string | number; invoice_number: string }>(
@@ -190,8 +211,10 @@ export async function insertDraftInvoice(
        subtotal,
        grand_total,
        status,
-       issued_by_user_id
-     ) VALUES ($1, $2, $3, $4, $5, $6, 0.00, $6, 'DRAFT', $7)
+       issued_by_user_id,
+       vehicle_category,
+       unit_snapshot
+     ) VALUES ($1, $2, $3, $4, $5, $6, 0.00, $6, 'DRAFT', $7, $8, $9)
      RETURNING id, invoice_number`,
     [
       params.customerId,
@@ -201,6 +224,8 @@ export async function insertDraftInvoice(
       params.hasTransport,
       params.transportFee,
       params.issuedByUserId,
+      params.vehicleCategory ?? null,
+      params.unitSnapshot ?? null,
     ]
   );
   return {
@@ -218,6 +243,8 @@ export async function insertInvoiceItem(
     quantity: string;
     unitPrice: string;
     lineTotal: string;
+    unitSnapshot?: string | null;
+    vehicleCategorySnapshot?: string | null;
   }
 ): Promise<void> {
   await client.query(
@@ -227,8 +254,10 @@ export async function insertInvoiceItem(
        material_name_snapshot,
        quantity,
        unit_price,
-       line_total
-     ) VALUES ($1, $2, $3, $4, $5, $6)`,
+       line_total,
+       unit_snapshot,
+       vehicle_category_snapshot
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       params.invoiceId,
       params.materialId,
@@ -236,6 +265,8 @@ export async function insertInvoiceItem(
       params.quantity,
       params.unitPrice,
       params.lineTotal,
+      params.unitSnapshot ?? null,
+      params.vehicleCategorySnapshot ?? null,
     ]
   );
 }
@@ -309,7 +340,9 @@ export async function listIssuedInvoices(
        ilv.issued_by_user_id,
        u.full_name AS issued_by_name,
        ilv.issued_at,
-       ilv.business_date::text AS business_date
+       ilv.business_date::text AS business_date,
+       ilv.vehicle_category,
+       ilv.unit_snapshot
      FROM public.invoice_ledger_view ilv
      JOIN public.users u ON u.id = ilv.issued_by_user_id
      ${whereClause}
@@ -345,7 +378,9 @@ export async function findInvoiceDetailById(
        ilv.issued_by_user_id,
        u.full_name AS issued_by_name,
        ilv.issued_at,
-       ilv.business_date::text AS business_date
+       ilv.business_date::text AS business_date,
+       ilv.vehicle_category,
+       ilv.unit_snapshot
      FROM public.invoice_ledger_view ilv
      JOIN public.users u ON u.id = ilv.issued_by_user_id
      WHERE ilv.invoice_id = $1
@@ -365,7 +400,9 @@ export async function findInvoiceDetailById(
        material_name_snapshot,
        quantity::text AS quantity,
        unit_price::text AS unit_price,
-       line_total::text AS line_total
+       line_total::text AS line_total,
+       unit_snapshot,
+       vehicle_category_snapshot
      FROM public.invoice_items
      WHERE invoice_id = $1
      ORDER BY id ASC`,
@@ -397,6 +434,8 @@ export async function findInvoiceDetailById(
     quantity: r.quantity,
     unitPrice: r.unit_price,
     lineTotal: r.line_total,
+    unitSnapshot: r.unit_snapshot || "m³",
+    vehicleCategorySnapshot: (r.vehicle_category_snapshot as VehicleCategory) || null,
   }));
 
   const payments: InvoicePaymentDto[] = paymentsRes.rows.map((p) => ({
