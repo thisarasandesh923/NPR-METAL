@@ -240,9 +240,13 @@ export function useInvoiceForm() {
     if (!/^\d+(?:\.\d{1,2})?$/.test(payTrimmed)) {
       return "Initial payment must be a valid non-negative LKR amount.";
     }
-    if (totals.isOverpayment) {
-      return "Initial cash received cannot exceed the grand total.";
-    }
+    if (
+      !Number.isFinite(Number(payTrimmed)) ||
+         Number(payTrimmed) > 9999999999.99
+    )
+    {
+  return "Cash received exceeds the maximum allowed amount.";
+      }
     return null;
   };
 
@@ -278,7 +282,15 @@ export function useInvoiceForm() {
         })),
         hasTransport: withTransport,
         transportFee: withTransport ? transportFee.trim() || "0.00" : "0.00",
-        initialPaymentAmount: cashReceived.trim() || "0.00",
+
+          initialPaymentAmount: totals.paidAmount.toFixed(2),
+
+          ...(Number(cashReceived.trim() || "0.00") > 0
+  ? {
+      initialCashTendered: cashReceived.trim(),
+    }
+          : {}),
+
         idempotencyKey,
       };
 
@@ -345,10 +357,11 @@ export function useInvoiceForm() {
     resetForNewInvoice,
     unconfiguredItem,
     unconfiguredWarning,
-    canSubmit:
-      !materialsLoading &&
-      materials.length > 0 &&
-      !totals.isOverpayment &&
-      !unconfiguredItem,
+
+      canSubmit:
+  !materialsLoading &&
+  materials.length > 0 &&
+  !unconfiguredItem,
+
   };
 }

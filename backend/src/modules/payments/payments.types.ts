@@ -1,9 +1,12 @@
+
 export interface RecordPaymentInput {
   invoiceId: number;
   amount: string | number;
+  cashTendered?: string | number;
   idempotencyKey: string;
   notes?: string | null;
 }
+
 
 export interface AdjustPaymentInput {
   paymentId: number;

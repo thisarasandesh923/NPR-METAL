@@ -57,6 +57,9 @@ function computeInvoiceRequestHash(
     hasTransport: input.hasTransport,
     transportFee: String(input.transportFee).trim(),
     initialPaymentAmount: String(input.initialPaymentAmount ?? "0").trim(),
+    ...(input.initialCashTendered !== undefined
+      ? { initialCashTendered: String(input.initialCashTendered).trim() }
+      : {}),
     initialPaymentNotes: input.initialPaymentNotes?.trim() ?? null,
   };
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
@@ -147,6 +150,30 @@ export class InvoicesService {
       input.initialPaymentAmount !== undefined
         ? parseMoneyCents(input.initialPaymentAmount, "Initial payment")
         : 0n;
+
+    const initialCashTenderedCents =
+      input.initialCashTendered !== undefined
+        ? parseMoneyCents(input.initialCashTendered, "Initial cash tendered")
+        : null;
+
+    if (initialCashTenderedCents !== null) {
+      if (initialPaymentCents <= 0n) {
+        throw new ValidationError(
+          "Cash tendered requires a positive initial payment."
+        );
+      }
+
+      if (initialCashTenderedCents < initialPaymentCents) {
+        throw new ValidationError(
+          "Cash tendered cannot be less than the initial payment."
+        );
+      }
+    }
+
+    const initialChangeReturnedCents =
+      initialCashTenderedCents === null
+        ? null
+        : initialCashTenderedCents - initialPaymentCents;
 
     const normalizedItems = input.items.map((item) => ({
       materialId: item.materialId,
@@ -319,6 +346,14 @@ export class InvoicesService {
           invoiceId: draft.id,
           cashierUserId: actor.userId,
           amount: formatScaledDecimal(initialPaymentCents, 2),
+          cashTendered:
+            initialCashTenderedCents === null
+              ? null
+              : formatScaledDecimal(initialCashTenderedCents, 2),
+          changeReturned:
+            initialChangeReturnedCents === null
+              ? null
+              : formatScaledDecimal(initialChangeReturnedCents, 2),
           idempotencyKey: initPayKey,
           notes:
             input.initialPaymentNotes?.trim() || "Initial cash payment at invoice issue",
@@ -338,6 +373,14 @@ export class InvoicesService {
           unitSnapshot: "ft³",
           grandTotal: formatScaledDecimal(grandTotalCents, 2),
           initialPayment: formatScaledDecimal(initialPaymentCents, 2),
+          initialCashTendered:
+            initialCashTenderedCents === null
+              ? null
+              : formatScaledDecimal(initialCashTenderedCents, 2),
+          initialChangeReturned:
+            initialChangeReturnedCents === null
+              ? null
+              : formatScaledDecimal(initialChangeReturnedCents, 2),
           initialReceiptNumber,
           itemCount: computedLines.length,
         },

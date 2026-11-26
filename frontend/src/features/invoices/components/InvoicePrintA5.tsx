@@ -1,3 +1,4 @@
+
 import type { InvoiceDetail } from "../../../types/billing.ts";
 import {
   formatColomboDateTime,
@@ -8,7 +9,9 @@ interface InvoicePrintA5Props {
   invoice: InvoiceDetail;
 }
 
-function formatPaymentStatusLabel(status: InvoiceDetail["paymentStatus"]): string {
+function formatPaymentStatusLabel(
+  status: InvoiceDetail["paymentStatus"]
+): string {
   switch (status) {
     case "PAID":
       return "PAID / සම්පූර්ණයෙන් ගෙවා ඇත";
@@ -23,105 +26,174 @@ function formatPaymentStatusLabel(status: InvoiceDetail["paymentStatus"]): strin
   }
 }
 
-export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
+export function InvoicePrintA5({
+  invoice,
+}: InvoicePrintA5Props) {
+  // Latest payment associated with this invoice.
+  const latestPayment =
+    invoice.payments[invoice.payments.length - 1];
+
+  // Older payments may not contain cash change details.
+  const hasCashChangeDetails =
+    latestPayment?.cashTendered != null &&
+    latestPayment?.changeReturned != null;
+
   return (
     <section
       aria-label={`Printable A5 Invoice ${invoice.invoiceNumber}`}
       className="print-only-sheet print-a5-sheet bg-white text-[#092547]"
     >
       <div className="mx-auto max-w-[138mm] border border-slate-300 p-4 text-[11px] leading-snug">
+
+        {/* Workshop Header */}
         <header className="flex items-start justify-between border-b-2 border-[#092547] pb-3">
           <div>
             <h1 className="text-lg font-extrabold tracking-wide text-[#092547]">
               NPR METAL CRUSHER
             </h1>
+
             <p className="text-[10px] font-semibold text-slate-700">
               Seenimodara, Sri Lanka
             </p>
+
             <p className="text-[9px] font-bold text-slate-600">
               Proprietor: Nalaka Ranasinghe
             </p>
+
             <p className="text-[9px] uppercase tracking-[0.08em] text-slate-500">
-              Aggregates: 3/4&quot;, Dust, 6×9, ABC · Crushed Metal Quarry
+              Aggregates: 3/4&quot;, Dust, 6×9, ABC
+              {" "}· Crushed Metal Quarry
             </p>
           </div>
+
           <div className="text-right">
             <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-500">
               Invoice / බිල්පත
             </p>
+
             <p className="text-sm font-extrabold text-[#092547]">
               {invoice.invoiceNumber}
             </p>
           </div>
         </header>
 
+        {/* Customer and Invoice Details */}
         <div className="mt-3 grid grid-cols-2 gap-3 border-b border-slate-200 pb-3">
           <div>
             <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
               Customer / පාරිභෝගිකයා
             </p>
+
             <p className="mt-0.5 text-xs font-extrabold text-[#092547]">
               {invoice.customerName}
             </p>
+
             <p className="text-[10px] text-slate-700">
               Tel / දුරකථනය: {invoice.customerPhone}
             </p>
+
             <p className="text-[10px] text-slate-700">
               Site / ස්ථානය: {invoice.customerLocation}
             </p>
           </div>
+
           <div className="text-right">
             <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
               Issue Details / විස්තර
             </p>
+
             <p className="mt-0.5 text-[10px] text-slate-700">
-              Date / දිනය: <strong>{formatColomboDateTime(invoice.issuedAt)}</strong>
+              Date / දිනය:{" "}
+              <strong>
+                {formatColomboDateTime(invoice.issuedAt)}
+              </strong>
             </p>
+
             <p className="text-[10px] text-slate-700">
-              Cashier / අයකැමි: <strong>{invoice.issuedByName}</strong>
+              Cashier / අයකැමි:{" "}
+              <strong>{invoice.issuedByName}</strong>
             </p>
+
             <p className="text-[10px] text-slate-700">
               Transport / ප්‍රවාහනය:{" "}
               <strong>
-                {invoice.hasTransport ? "With Transport (සහිතයි)" : "Customer Pickup (රහිතයි)"}
+                {invoice.hasTransport
+                  ? "With Transport (සහිතයි)"
+                  : "Customer Pickup (රහිතයි)"}
               </strong>
             </p>
+
             {invoice.vehicleCategory && (
               <p className="text-[10px] text-slate-700">
                 Rate / මිල කාණ්ඩය:{" "}
                 <strong>
-                  {invoice.vehicleCategory === "TRACTOR" ? "Tractor (ට්‍රැක්ටර්)" : "Tipper (ටිපර්)"}
+                  {invoice.vehicleCategory === "TRACTOR"
+                    ? "Tractor (ට්‍රැක්ටර්)"
+                    : "Tipper (ටිපර්)"}
                 </strong>
               </p>
             )}
           </div>
         </div>
 
+        {/* Material Items Table */}
         <table className="mt-3 w-full border-collapse text-[10px]">
           <thead>
             <tr className="border-b border-slate-400 bg-slate-100 text-left">
-              <th className="px-2 py-1.5 font-bold">#</th>
-              <th className="px-2 py-1.5 font-bold">Material / ද්‍රව්‍යය</th>
-              <th className="px-2 py-1.5 text-right font-bold">
-                Qty / ප්‍රමාණය ({invoice.unitSnapshot || invoice.items[0]?.unitSnapshot || "m³"})
+              <th className="px-2 py-1.5 font-bold">
+                #
               </th>
-              <th className="px-2 py-1.5 text-right font-bold">Unit Price / ඒකක මිල</th>
-              <th className="px-2 py-1.5 text-right font-bold">Total / මුළු මුදල</th>
+
+              <th className="px-2 py-1.5 font-bold">
+                Material / ද්‍රව්‍යය
+              </th>
+
+              <th className="px-2 py-1.5 text-right font-bold">
+                Qty / ප්‍රමාණය (
+                {invoice.unitSnapshot ||
+                  invoice.items[0]?.unitSnapshot ||
+                  "m³"}
+                )
+              </th>
+
+              <th className="px-2 py-1.5 text-right font-bold">
+                Unit Price / ඒකක මිල
+              </th>
+
+              <th className="px-2 py-1.5 text-right font-bold">
+                Total / මුළු මුදල
+              </th>
             </tr>
           </thead>
+
           <tbody>
             {invoice.items.map((item, idx) => {
-              const itemUnit = item.unitSnapshot || invoice.unitSnapshot || "m³";
+              const itemUnit =
+                item.unitSnapshot ||
+                invoice.unitSnapshot ||
+                "m³";
+
               return (
-                <tr key={item.id} className="border-b border-slate-200">
-                  <td className="px-2 py-1.5">{idx + 1}</td>
-                  <td className="px-2 py-1.5 font-bold">{item.materialName}</td>
+                <tr
+                  key={item.id}
+                  className="border-b border-slate-200"
+                >
+                  <td className="px-2 py-1.5">
+                    {idx + 1}
+                  </td>
+
+                  <td className="px-2 py-1.5 font-bold">
+                    {item.materialName}
+                  </td>
+
                   <td className="px-2 py-1.5 text-right">
                     {item.quantity} {itemUnit}
                   </td>
+
                   <td className="px-2 py-1.5 text-right">
                     {formatLkr(item.unitPrice)}
                   </td>
+
                   <td className="px-2 py-1.5 text-right font-bold">
                     {formatLkr(item.lineTotal)}
                   </td>
@@ -131,67 +203,168 @@ export function InvoicePrintA5({ invoice }: InvoicePrintA5Props) {
           </tbody>
         </table>
 
+        {/* Payment Receipts and Financial Summary */}
         <div className="mt-3 flex justify-between gap-4 border-b border-slate-200 pb-3">
+
+          {/* Payment Receipt History */}
           <div className="w-1/2">
             <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500">
-              Payment Receipts / ගෙවීම් රිසිට්පත් ({invoice.payments.length})
+              Payment Receipts / ගෙවීම් රිසිට්පත්
+              {" "}({invoice.payments.length})
             </p>
+
             {invoice.payments.length === 0 ? (
               <p className="mt-1 text-[10px] text-slate-600">
-                No cash payments recorded yet (ණය බිල්පතකි).
+                No cash payments recorded yet
+                {" "}(ණය බිල්පතකි).
               </p>
             ) : (
               <ul className="mt-1 space-y-0.5 text-[10px] text-slate-700">
                 {invoice.payments.map((p) => (
                   <li key={p.id}>
-                    {p.receiptNumber}: <strong>{formatLkr(p.amount)}</strong> (
-                    {formatColomboDateTime(p.createdAt)})
+                    {p.receiptNumber}:{" "}
+                    <strong>
+                      {formatLkr(p.amount)}
+                    </strong>
+                    {" "}(
+                    {formatColomboDateTime(p.createdAt)}
+                    )
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
+          {/* Invoice Financial Summary */}
           <div className="w-1/2 space-y-1 text-right text-[10px]">
-            <div className="flex justify-between">
-              <span className="text-slate-600">Subtotal / ද්‍රව්‍ය එකතුව:</span>
-              <strong>{formatLkr(invoice.subtotal)}</strong>
+
+            {/* Subtotal */}
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-600">
+                Subtotal / ද්‍රව්‍ය එකතුව:
+              </span>
+
+              <strong>
+                {formatLkr(invoice.subtotal)}
+              </strong>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-600">Transport / ප්‍රවාහන ගාස්තුව:</span>
-              <strong>{formatLkr(invoice.transportFee)}</strong>
+
+            {/* Transport */}
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-600">
+                Transport / ප්‍රවාහන ගාස්තුව:
+              </span>
+
+              <strong>
+                {formatLkr(invoice.transportFee)}
+              </strong>
             </div>
-            <div className="flex justify-between border-t border-slate-300 pt-1 text-xs">
-              <span className="font-extrabold">Grand Total / මුළු මුදල:</span>
-              <strong className="text-[#092547]">{formatLkr(invoice.grandTotal)}</strong>
+
+            {/* Grand Total */}
+            <div className="flex justify-between gap-2 border-t border-slate-300 pt-1 text-xs">
+              <span className="font-extrabold">
+                Grand Total / මුළු මුදල:
+              </span>
+
+              <strong className="text-[#092547]">
+                {formatLkr(invoice.grandTotal)}
+              </strong>
             </div>
-            <div className="flex justify-between text-emerald-800">
-              <span>Amount Paid / ගෙවූ මුදල:</span>
-              <strong>{formatLkr(invoice.paidAmount)}</strong>
+
+            {/* Total Payments Applied to Invoice */}
+            <div className="flex justify-between gap-2 text-emerald-800">
+              <span>
+                Amount Paid / ගෙවූ මුදල:
+              </span>
+
+              <strong>
+                {formatLkr(invoice.paidAmount)}
+              </strong>
             </div>
-            <div className="flex justify-between border-t border-slate-300 pt-1 text-xs">
-              <span className="font-extrabold">Balance Due / ඉතිරි මුදල:</span>
-              <strong className="text-[#e77418]">{formatLkr(invoice.balanceDue)}</strong>
+
+            {/* NEW: Cash Tendered and Change Returned */}
+            {hasCashChangeDetails && latestPayment && (
+              <div className="space-y-1 border-t border-dashed border-slate-300 pt-2">
+
+                {/* Latest Cash Payment Reference */}
+                <p className="text-[9px] text-slate-500">
+                  Latest Cash Receipt:{" "}
+                  {latestPayment.receiptNumber}
+                </p>
+
+                {/* Customer Cash Tendered */}
+                <div className="flex justify-between gap-2">
+                  <span>
+                    Cash Given / දුන් මුදල:
+                  </span>
+
+                  <strong>
+                    {formatLkr(
+                      latestPayment.cashTendered!
+                    )}
+                  </strong>
+                </div>
+
+                {/* Change Returned to Customer */}
+                <div className="flex justify-between gap-2 text-emerald-800">
+                  <span className="font-bold">
+                    Change / මාරු මුදල:
+                  </span>
+
+                  <strong>
+                    {formatLkr(
+                      latestPayment.changeReturned!
+                    )}
+                  </strong>
+                </div>
+              </div>
+            )}
+
+            {/* Outstanding Balance */}
+            <div className="flex justify-between gap-2 border-t border-slate-300 pt-1 text-xs">
+              <span className="font-extrabold">
+                Balance Due / ඉතිරි මුදල:
+              </span>
+
+              <strong className="text-[#e77418]">
+                {formatLkr(invoice.balanceDue)}
+              </strong>
             </div>
+
+            {/* Invoice Payment Status */}
             <p className="pt-0.5 text-[9px] font-extrabold uppercase tracking-[0.08em] text-slate-600">
-              Status: {formatPaymentStatusLabel(invoice.paymentStatus)}
+              Status:{" "}
+              {formatPaymentStatusLabel(
+                invoice.paymentStatus
+              )}
             </p>
           </div>
         </div>
 
+        {/* Invoice Footer */}
         <footer className="mt-4 pt-2">
           <p className="text-[9px] text-slate-500">
-            Official computer-generated invoice. Commercial terms and prices are permanently locked upon issuance.
-            නිල පරිගණක මුද්‍රිත බිල්පතකි. ස්තූතියි!
+            Official computer-generated invoice.
+            Commercial terms and prices are permanently
+            locked upon issuance.
+            {" "}නිල පරිගණක මුද්‍රිත බිල්පතකි. ස්තූතියි!
           </p>
+
           <div className="mt-6 grid grid-cols-2 gap-8 text-center text-[10px]">
             <div className="border-t border-slate-400 pt-1">
-              Customer / Receiver Signature<br />
-              <span className="text-[9px] text-slate-500">පාරිභෝගික / භාරගන්නාගේ අත්සන</span>
+              Customer / Receiver Signature
+              <br />
+              <span className="text-[9px] text-slate-500">
+                පාරිභෝගික / භාරගන්නාගේ අත්සන
+              </span>
             </div>
+
             <div className="border-t border-slate-400 pt-1">
-              Authorized Cashier ({invoice.issuedByName})<br />
-              <span className="text-[9px] text-slate-500">බලයලත් මුදල් අයකැමි අත්සන</span>
+              Authorized Cashier ({invoice.issuedByName})
+              <br />
+              <span className="text-[9px] text-slate-500">
+                බලයලත් මුදල් අයකැමි අත්සන
+              </span>
             </div>
           </div>
         </footer>

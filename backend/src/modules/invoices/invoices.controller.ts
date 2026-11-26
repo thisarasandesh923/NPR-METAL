@@ -53,8 +53,11 @@ const createInvoiceSchema = z
       .max(50, "Cannot exceed 50 items per invoice."),
     hasTransport: z.boolean(),
     transportFee: decimalInputSchema,
-    initialPaymentAmount: decimalInputSchema.optional(),
-    initialPaymentNotes: z.string().trim().max(500).optional().nullable(),
+
+initialPaymentAmount: decimalInputSchema.optional(),
+initialCashTendered: decimalInputSchema.optional(),
+initialPaymentNotes: z.string().trim().max(500).optional().nullable(),
+
     idempotencyKey: z
       .string({ error: "Idempotency key is required." })
       .trim()

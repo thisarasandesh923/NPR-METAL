@@ -58,6 +58,7 @@ export async function lockInvoicePaymentBounds(
   };
 }
 
+
 export async function insertCashPayment(
   client: PoolClient,
   params: {
@@ -66,6 +67,8 @@ export async function insertCashPayment(
     amount: string;
     idempotencyKey: string;
     notes: string | null;
+    cashTendered?: string | null;
+    changeReturned?: string | null;
   }
 ): Promise<CreatedPaymentRow> {
   const res = await client.query<CreatedPaymentRow>(
@@ -75,8 +78,10 @@ export async function insertCashPayment(
        amount,
        payment_method,
        idempotency_key,
-       notes
-     ) VALUES ($1, $2, $3, 'CASH', $4, $5)
+       notes,
+       cash_tendered,
+       change_returned
+     ) VALUES ($1, $2, $3, 'CASH', $4, $5, $6, $7)
      RETURNING id, receipt_number, created_at`,
     [
       params.invoiceId,
@@ -84,10 +89,14 @@ export async function insertCashPayment(
       params.amount,
       params.idempotencyKey,
       params.notes,
+      params.cashTendered ?? null,
+      params.changeReturned ?? null,
     ]
   );
+
   return res.rows[0];
 }
+
 
 export async function lockPaymentForAdjustment(
   client: PoolClient,

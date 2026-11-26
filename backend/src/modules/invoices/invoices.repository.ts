@@ -55,6 +55,7 @@ interface InvoiceItemRow {
   vehicle_category_snapshot: string | null;
 }
 
+
 interface InvoicePaymentRow {
   id: string | number;
   receipt_number: string;
@@ -62,10 +63,13 @@ interface InvoicePaymentRow {
   cashier_user_id: string;
   cashier_name: string;
   amount: string;
+  cash_tendered: string | null;
+  change_returned: string | null;
   payment_method: "CASH";
   notes: string | null;
   created_at: Date;
 }
+
 
 function escapeLikePattern(raw: string): string {
   return raw.replace(/[\\%_]/g, "\\$&");
@@ -416,8 +420,10 @@ export async function findInvoiceDetailById(
        p.invoice_id,
        p.cashier_user_id,
        u.full_name AS cashier_name,
-       p.amount::text AS amount,
-       p.payment_method,
+      p.amount::text AS amount,
+        p.cash_tendered::text AS cash_tendered,
+      p.change_returned::text AS change_returned,
+      p.payment_method,
        p.notes,
        p.created_at
      FROM public.payments p
@@ -445,6 +451,10 @@ export async function findInvoiceDetailById(
     cashierUserId: p.cashier_user_id,
     cashierName: p.cashier_name,
     amount: p.amount,
+
+    cashTendered: p.cash_tendered,
+    changeReturned: p.change_returned,
+
     paymentMethod: p.payment_method,
     notes: p.notes,
     createdAt: p.created_at.toISOString(),

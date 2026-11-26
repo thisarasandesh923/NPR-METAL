@@ -22,6 +22,7 @@ export interface InvoiceItemDto {
   vehicleCategorySnapshot?: VehicleCategory | null;
 }
 
+
 export interface InvoicePaymentDto {
   id: number;
   receiptNumber: string;
@@ -29,10 +30,13 @@ export interface InvoicePaymentDto {
   cashierUserId: string;
   cashierName: string;
   amount: string;
+  cashTendered: string | null;
+  changeReturned: string | null;
   paymentMethod: "CASH";
   notes: string | null;
   createdAt: string;
 }
+
 
 export interface InvoiceSummaryDto {
   id: number;
@@ -95,6 +99,7 @@ export interface CreateInvoiceInput {
   hasTransport: boolean;
   transportFee: string | number;
   initialPaymentAmount?: string | number;
+  initialCashTendered?: string | number;
   initialPaymentNotes?: string | null;
   idempotencyKey: string;
 }

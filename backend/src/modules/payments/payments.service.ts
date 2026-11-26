@@ -53,8 +53,14 @@ function computePaymentRequestHash(
     invoiceId: input.invoiceId,
     amount: String(input.amount).trim(),
     notes: input.notes?.trim() ?? null,
+    ...(input.cashTendered !== undefined
+      ? { cashTendered: String(input.cashTendered).trim() }
+      : {}),
   };
-  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+
+  return createHash("sha256")
+    .update(JSON.stringify(canonical))
+    .digest("hex");
 }
 
 function parsePositivePaymentCents(raw: string | number): bigint {
@@ -74,6 +80,60 @@ function parsePositivePaymentCents(raw: string | number): bigint {
   return cents;
 }
 
+function calculateCashChange(
+  paymentAmount: string | number,
+  cashTendered?: string | number
+): {
+  cashTendered: string | null;
+  changeReturned: string | null;
+} {
+  // Keep legacy payment requests compatible.
+  if (cashTendered === undefined) {
+    return {
+      cashTendered: null,
+      changeReturned: null,
+    };
+  }
+
+  let tenderedCents: bigint;
+
+  try {
+    tenderedCents = parseScaledDecimal(
+      cashTendered,
+      2,
+      "Cash tendered"
+    );
+  } catch (error) {
+    throw new ValidationError(
+      error instanceof Error
+        ? error.message
+        : "Invalid cash tendered amount."
+    );
+  }
+
+  const paymentCents = parsePositivePaymentCents(paymentAmount);
+
+  if (tenderedCents < paymentCents) {
+    throw new ValidationError(
+      "Cash tendered cannot be less than the payment amount."
+    );
+  }
+
+  if (tenderedCents > 999999999999n) {
+    throw new ValidationError(
+      "Cash tendered exceeds the maximum allowed amount."
+    );
+  }
+
+  return {
+    cashTendered: formatScaledDecimal(tenderedCents, 2),
+    changeReturned: formatScaledDecimal(
+      tenderedCents - paymentCents,
+      2
+    ),
+  };
+}
+
 export class PaymentsService {
   constructor(private readonly pool: Pool) {}
 
@@ -86,6 +146,7 @@ export class PaymentsService {
     replayed: boolean;
   }> {
     const amountCents = parsePositivePaymentCents(input.amount);
+    const cashChange = calculateCashChange(input.amount, input.cashTendered);
     const requestHash = computePaymentRequestHash(actor.userId, input);
 
     const client = await this.pool.connect();
@@ -187,6 +248,8 @@ export class PaymentsService {
         amount: amountFormatted,
         idempotencyKey: input.idempotencyKey,
         notes: input.notes?.trim() || null,
+        cashTendered: cashChange.cashTendered,
+        changeReturned: cashChange.changeReturned,
       });
 
       await insertAuthAuditLog(client, {
@@ -199,6 +262,8 @@ export class PaymentsService {
           invoiceNumber: bounds.invoiceNumber,
           receiptNumber: created.receipt_number,
           amount: amountFormatted,
+          cashTendered: cashChange.cashTendered,
+          changeReturned: cashChange.changeReturned,
         },
         ipAddress: actor.ipAddress,
       });

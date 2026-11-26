@@ -55,6 +55,8 @@ export interface InvoicePaymentRecord {
   cashierUserId: string;
   cashierName: string;
   amount: string;
+  cashTendered: string | null;
+  changeReturned: string | null;
   paymentMethod: "CASH";
   notes: string | null;
   createdAt: string;
@@ -130,6 +132,7 @@ export interface CreateInvoiceRequest {
   hasTransport: boolean;
   transportFee: string;
   initialPaymentAmount?: string;
+  initialCashTendered?: string;
   initialPaymentNotes?: string | null;
   idempotencyKey: string;
 }
@@ -137,6 +140,7 @@ export interface CreateInvoiceRequest {
 export interface RecordPaymentRequest {
   invoiceId: number;
   amount: string;
+  cashTendered?: string;
   idempotencyKey: string;
   notes?: string | null;
 }

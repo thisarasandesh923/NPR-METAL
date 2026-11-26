@@ -53,22 +53,22 @@ export function calculatePaidAndBalance(
   };
 }
 
+
 export function determinePaymentStatus(
   paidAmount: number,
-  balance: number,
-  isOverpayment = false
+  balance: number
 ): PaymentStatus {
-  if (isOverpayment) {
-    return "Invalid (Overpaid)";
-  }
   if (paidAmount <= 0) {
     return "Unpaid";
   }
+
   if (balance <= 0) {
     return "Paid";
   }
+
   return "Partial";
 }
+
 
 export function calculateInvoiceTotals(
   items: MaterialRow[],
@@ -82,7 +82,7 @@ export function calculateInvoiceTotals(
     cashReceived,
     grandTotal
   );
-  const paymentStatus = determinePaymentStatus(paidAmount, balance, isOverpayment);
+  const paymentStatus = determinePaymentStatus(paidAmount, balance);
 
   return {
     subtotal,

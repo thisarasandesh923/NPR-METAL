@@ -7,6 +7,11 @@ const recordPaymentSchema = z.object({
   invoiceId: z.number().int().positive("Valid invoiceId is required."),
   amount: z.union([z.string().trim().min(1), z.number().finite()]),
 
+  cashTendered: z.union([
+  z.string().trim().min(1),
+  z.number().finite()
+]).optional(),
+
   paymentMethod: z.literal("CASH").optional(),
 
   idempotencyKey: z
